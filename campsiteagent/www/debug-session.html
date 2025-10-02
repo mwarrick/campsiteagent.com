@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Session Debug - CampsiteAgent</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .debug-result {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ccc;
+            background: #f9f9f9;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>Session Debug Page</h1>
+    
+    <button id="checkSession">Check Session</button>
+    <button id="checkMe">Check /api/me</button>
+    <button id="checkCookies">Check Cookies</button>
+    <button id="clearSession">Clear Session</button>
+    
+    <div id="results" class="debug-result">
+        Click buttons to debug session issues...
+    </div>
+
+    <script>
+        function log(message) {
+            const results = document.getElementById('results');
+            results.textContent += new Date().toLocaleTimeString() + ': ' + message + '\n';
+        }
+
+        async function checkSession() {
+            log('=== CHECKING SESSION ===');
+            try {
+                const res = await fetch('/api/me');
+                const text = await res.text();
+                log('Session check response: ' + res.status);
+                log('Response body: ' + text);
+                
+                if (res.ok) {
+                    const data = JSON.parse(text);
+                    log('User data: ' + JSON.stringify(data, null, 2));
+                }
+            } catch (e) {
+                log('Session check error: ' + e.message);
+            }
+        }
+
+        async function checkMe() {
+            log('=== CHECKING /api/me ===');
+            try {
+                const res = await fetch('/api/me');
+                const text = await res.text();
+                log('/api/me response: ' + res.status + ' - ' + text);
+            } catch (e) {
+                log('/api/me error: ' + e.message);
+            }
+        }
+
+        function checkCookies() {
+            log('=== CHECKING COOKIES ===');
+            log('Document cookies: ' + document.cookie);
+            log('PHPSESSID: ' + getCookie('PHPSESSID'));
+        }
+
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        }
+
+        async function clearSession() {
+            log('=== CLEARING SESSION ===');
+            try {
+                const res = await fetch('/api/logout', { method: 'POST' });
+                log('Logout response: ' + res.status);
+                setTimeout(() => {
+                    log('Session cleared. Try checking session again.');
+                }, 1000);
+            } catch (e) {
+                log('Logout error: ' + e.message);
+            }
+        }
+
+        document.getElementById('checkSession').addEventListener('click', checkSession);
+        document.getElementById('checkMe').addEventListener('click', checkMe);
+        document.getElementById('checkCookies').addEventListener('click', checkCookies);
+        document.getElementById('clearSession').addEventListener('click', clearSession);
+    </script>
+</body>
+</html>

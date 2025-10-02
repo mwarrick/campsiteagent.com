@@ -1,0 +1,14 @@
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [QSA,L]
+
+# PHP Memory & Execution Settings
+php_value memory_limit 512M
+php_value max_execution_time 300
+php_value max_input_time 300
+
+# Disable buffering for Server-Sent Events
+<IfModule mod_headers.c>
+    Header always set X-Accel-Buffering "no"
+</IfModule>

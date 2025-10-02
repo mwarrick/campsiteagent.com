@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Campsite Agent — California State Park Availability</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #1a202c; min-height: 100vh; }
+    .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; text-align: center; }
+    .hero { background: rgba(255,255,255,0.95); border-radius: 20px; padding: 60px 40px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
+    h1 { font-size: 3rem; margin: 0 0 20px 0; background: linear-gradient(135deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .subtitle { font-size: 1.3rem; color: #4a5568; margin-bottom: 40px; }
+    .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 30px; margin: 50px 0; }
+    .feature { background: #f7fafc; padding: 30px; border-radius: 15px; border-left: 4px solid #667eea; }
+    .feature h3 { margin: 0 0 15px 0; color: #2d3748; }
+    .feature p { margin: 0; color: #4a5568; line-height: 1.6; }
+    .cta { margin-top: 50px; }
+    .btn { display: inline-block; background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 15px 30px; border-radius: 50px; text-decoration: none; font-weight: 600; font-size: 1.1rem; transition: transform 0.2s; }
+    .btn:hover { transform: translateY(-2px); }
+    .btn-secondary { background: #4a5568; margin-left: 15px; }
+    .auth-section { margin-top: 30px; padding-top: 30px; border-top: 1px solid #e2e8f0; }
+    .auth-section p { color: #4a5568; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <h1>Campsite Agent</h1>
+      <p class="subtitle">Never miss a weekend camping spot at California State Parks</p>
+      
+      <div class="features">
+        <div class="feature">
+          <h3>🔍 Real-time Monitoring</h3>
+          <p>Automatically checks availability at popular parks like San Onofre State Beach</p>
+        </div>
+        <div class="feature">
+          <h3>📧 Instant Alerts</h3>
+          <p>Get email notifications the moment weekend sites become available</p>
+        </div>
+        <div class="feature">
+          <h3>📊 Live Dashboard</h3>
+          <p>View current availability, filter by park, and export data to CSV</p>
+        </div>
+      </div>
+
+      <div class="cta" id="ctaSection">
+        <a href="/dashboard.html" class="btn" id="dashboardBtn" style="display: none;">View Live Dashboard</a>
+        <a href="#register" class="btn btn-secondary" onclick="showRegister()">Get Started</a>
+        <a href="#login" class="btn btn-secondary" onclick="showLogin()">Login</a>
+      </div>
+
+      <div class="auth-section" id="authSection" style="display: none;">
+        <p>Enter your email to start receiving availability alerts:</p>
+        <input type="email" id="emailInput" placeholder="your@email.com" style="padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; width: 300px; margin-right: 10px;">
+        <button onclick="register()" style="padding: 12px 20px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer;">Register</button>
+        <p id="registerMessage" style="margin-top: 15px; font-size: 0.9rem;"></p>
+      </div>
+
+      <div class="auth-section" id="loginSection" style="display: none;">
+        <p>Enter your email to receive a login link:</p>
+        <input type="email" id="loginEmailInput" placeholder="your@email.com" style="padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; width: 300px; margin-right: 10px;">
+        <button onclick="login()" style="padding: 12px 20px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer;">Send Login Link</button>
+        <p id="loginMessage" style="margin-top: 15px; font-size: 0.9rem;"></p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function showRegister() {
+      document.getElementById('authSection').style.display = 'block';
+      document.getElementById('loginSection').style.display = 'none';
+      document.getElementById('emailInput').focus();
+    }
+
+    function showLogin() {
+      document.getElementById('loginSection').style.display = 'block';
+      document.getElementById('authSection').style.display = 'none';
+      document.getElementById('loginEmailInput').focus();
+    }
+
+    async function register() {
+      const email = document.getElementById('emailInput').value;
+      if (!email) {
+        document.getElementById('registerMessage').textContent = 'Please enter an email address';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        const text = await res.text();
+        let result = {};
+        try { result = text ? JSON.parse(text) : {}; } catch (_) {}
+        if (res.ok) {
+          document.getElementById('registerMessage').textContent = 'Registration successful! Check your email for verification link.';
+          document.getElementById('emailInput').value = '';
+        } else {
+          document.getElementById('registerMessage').textContent = 'Error: ' + (result.error || text || 'Registration failed');
+        }
+      } catch (e) {
+        document.getElementById('registerMessage').textContent = 'Error: ' + e.message;
+      }
+    }
+
+    async function login() {
+      const email = document.getElementById('loginEmailInput').value;
+      if (!email) {
+        document.getElementById('loginMessage').textContent = 'Please enter an email address';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        const text = await res.text();
+        let result = {};
+        try { result = text ? JSON.parse(text) : {}; } catch (_) {}
+        if (res.ok) {
+          document.getElementById('loginMessage').textContent = 'Login link sent! Check your email.';
+          document.getElementById('loginEmailInput').value = '';
+        } else {
+          document.getElementById('loginMessage').textContent = 'Error: ' + (result.error || text || 'Login failed');
+        }
+      } catch (e) {
+        document.getElementById('loginMessage').textContent = 'Error: ' + e.message;
+      }
+    }
+
+    // Check if user is already logged in
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/me');
+        if (res.ok) {
+          const response = await res.json();
+          if (response.authenticated) {
+            // User is logged in - show dashboard button and hide auth buttons
+            document.getElementById('dashboardBtn').style.display = 'inline-block';
+            document.querySelector('.cta a[onclick="showRegister()"]').style.display = 'none';
+            document.querySelector('.cta a[onclick="showLogin()"]').style.display = 'none';
+          }
+        }
+      } catch (e) {
+        // User not logged in, show normal landing page
+      }
+    }
+
+    checkAuth();
+  </script>
+</body>
+</html>

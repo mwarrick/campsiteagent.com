@@ -1,0 +1,179 @@
+# CampsiteAgent.com .gitignore
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.staging
+
+# Composer
+/vendor/
+composer.phar
+composer.lock
+
+# PHP
+*.log
+*.tmp
+*.cache
+*.swp
+*.swo
+*~
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.phpstorm.meta.php
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# nyc test coverage
+.nyc_output
+
+# Dependency directories
+node_modules/
+
+# Optional npm cache directory
+.npm
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
+.env
+
+# Database
+*.sqlite
+*.db
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Cache files
+cache/
+*.cache
+
+# Upload directories
+uploads/
+files/
+
+# SSL certificates
+*.pem
+*.key
+*.crt
+*.csr
+
+# Gmail API credentials
+credentials.json
+token.json
+
+# Apache logs
+access.log
+error.log
+
+# MySQL logs
+mysql-slow.log
+mysql-error.log
+
+# PHP error logs
+php_errors.log
+
+# Backup directories
+backups/
+*.sql.gz
+*.tar.gz
+
+# Development tools
+.phpunit.result.cache
+.php-cs-fixer.cache
+
+# Local configuration overrides
+config.local.php
+settings.local.php
+
+# Test files
+tests/
+test/
+*Test.php
+*test.php
+
+# Documentation build
+docs/_build/
+site/
+
+# Package files
+*.zip
+*.tar
+*.tar.gz
+*.rar
+
+# Local development
+local/
+dev/
+development/
+
+# Production files that shouldn't be in repo
+production/
+prod/
+
+# Sensitive data
+secrets/
+private/
+confidential/
+
+# Build artifacts
+build/
+dist/
+out/
+
+# Deployment scripts (if they contain sensitive data)
+deploy.sh
+deploy/
+deployment/
+
+# Monitoring and analytics
+monitoring/
+analytics/
+stats/
+
+# Custom user uploads
+user-uploads/
+user-files/
+avatars/

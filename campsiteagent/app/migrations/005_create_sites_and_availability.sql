@@ -1,0 +1,25 @@
+-- Sites and availability
+CREATE TABLE IF NOT EXISTS sites (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  park_id BIGINT UNSIGNED NOT NULL,
+  site_number VARCHAR(50) NOT NULL,
+  site_type VARCHAR(100) NULL,
+  attributes_json JSON NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_park (park_id),
+  CONSTRAINT fk_sites_park FOREIGN KEY (park_id) REFERENCES parks(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS site_availability (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  site_id BIGINT UNSIGNED NOT NULL,
+  date DATE NOT NULL,
+  is_available TINYINT(1) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_site_date (site_id, date),
+  KEY idx_site (site_id),
+  CONSTRAINT fk_avail_site FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

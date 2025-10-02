@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login Test - CampsiteAgent</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .test-result {
+            margin: 20px 0;
+            padding: 10px;
+            border: 1px solid #ccc;
+            background: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <h1>Login Test Page</h1>
+    
+    <button id="testLogin">Test Login</button>
+    <button id="testRegister">Test Register</button>
+    <button id="testMe">Test /api/me</button>
+    
+    <div id="results" class="test-result">
+        Results will appear here...
+    </div>
+
+    <script>
+        function log(message) {
+            const results = document.getElementById('results');
+            results.innerHTML += '<div>' + new Date().toLocaleTimeString() + ': ' + message + '</div>';
+        }
+
+        async function testLogin() {
+            log('Testing login...');
+            try {
+                const email = prompt('Enter email for login test:');
+                if (!email) return;
+                
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                
+                const text = await res.text();
+                log('Login response: ' + res.status + ' - ' + text);
+            } catch (e) {
+                log('Login error: ' + e.message);
+            }
+        }
+
+        async function testRegister() {
+            log('Testing register...');
+            try {
+                const email = prompt('Enter email for register test:');
+                if (!email) return;
+                
+                const res = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        email: email,
+                        firstName: 'Test',
+                        lastName: 'User'
+                    })
+                });
+                
+                const text = await res.text();
+                log('Register response: ' + res.status + ' - ' + text);
+            } catch (e) {
+                log('Register error: ' + e.message);
+            }
+        }
+
+        async function testMe() {
+            log('Testing /api/me...');
+            try {
+                const res = await fetch('/api/me');
+                const text = await res.text();
+                log('Me response: ' + res.status + ' - ' + text);
+            } catch (e) {
+                log('Me error: ' + e.message);
+            }
+        }
+
+        document.getElementById('testLogin').addEventListener('click', testLogin);
+        document.getElementById('testRegister').addEventListener('click', testRegister);
+        document.getElementById('testMe').addEventListener('click', testMe);
+    </script>
+</body>
+</html>

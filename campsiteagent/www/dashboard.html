@@ -1,0 +1,831 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Campsite Agent — Availability</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background: #f7fafc; color: #1a202c; }
+    header { background: #2b6cb0; color: #fff; padding: 16px 20px; }
+    h1 { margin: 0; font-size: 20px; }
+    .container { max-width: 960px; margin: 24px auto; padding: 0 16px; }
+    .controls { background: #fff; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.06); padding: 16px 20px; margin-bottom: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    select, input[type="checkbox"] { font-size: 14px; padding: 6px 8px; }
+    button { padding: 8px 12px; background: #2b6cb0; color: #fff; border: none; border-radius: 8px; cursor: pointer; }
+    .card { background: #fff; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.06); padding: 16px 20px; margin-bottom: 16px; }
+    .park { font-weight: 700; font-size: 18px; margin-bottom: 8px; }
+    .site { display: flex; justify-content: space-between; padding: 8px 0; border-top: 1px solid #edf2f7; }
+    .site:first-child { border-top: none; }
+    .badge { background: #edf2f7; color: #2d3748; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
+    .dates { color: #4a5568; font-size: 14px; }
+    .empty { color: #718096; font-style: italic; }
+    .pager { display: flex; gap: 8px; align-items: center; margin: 12px 0; }
+    .pager button { background: #4a5568; }
+    .summary { background: #fff; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.06); padding: 12px 16px; margin-bottom: 16px; }
+    .summary ul { margin: 8px 0 0 16px; padding: 0; }
+    
+    /* Modal styles */
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
+    .modal.show { display: flex; align-items: center; justify-content: center; }
+    .modal-content { background: #fff; border-radius: 12px; padding: 24px; max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .modal-header h2 { margin: 0; font-size: 24px; }
+    .close-btn { background: #e2e8f0; color: #2d3748; padding: 6px 12px; cursor: pointer; border: none; border-radius: 6px; }
+    .close-btn:hover { background: #cbd5e0; }
+    
+    /* Preferences table */
+    .prefs-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    .prefs-table th { text-align: left; padding: 12px 8px; border-bottom: 2px solid #e2e8f0; font-weight: 600; color: #2d3748; }
+    .prefs-table td { padding: 12px 8px; border-bottom: 1px solid #e2e8f0; }
+    .prefs-table tr:hover { background: #f7fafc; }
+    .toggle-switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #cbd5e0; border-radius: 24px; transition: .3s; }
+    .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .3s; }
+    input:checked + .slider { background-color: #38a169; }
+    input:checked + .slider:before { transform: translateX(20px); }
+    .btn-sm { padding: 4px 10px; font-size: 13px; margin-left: 4px; }
+    .btn-danger { background: #e53e3e; }
+    .btn-danger:hover { background: #c53030; }
+    
+    /* Preferences form */
+    .pref-form { background: #f7fafc; padding: 16px; border-radius: 8px; margin-bottom: 20px; }
+    .pref-form label { display: block; margin-bottom: 12px; font-weight: 500; }
+    .pref-form input, .pref-form select { width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 14px; margin-top: 4px; }
+    .pref-form button { margin-top: 12px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h1>Weekend Availability</h1>
+      <div id="authSection">
+        <span id="userInfo" style="display: none;"></span>
+        <button id="preferencesBtn" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); display: none;">⚙️ Preferences</button>
+        <button id="loginBtn" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); margin-left: 8px;">Login</button>
+        <button id="registerBtn" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); margin-left: 8px;">Register</button>
+        <button id="logoutBtn" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); margin-left: 8px; display: none;">Logout</button>
+      </div>
+    </div>
+  </header>
+  <div class="container">
+    <div class="controls">
+      <label>
+        Park:
+        <select id="park"></select>
+      </label>
+      <label>
+        <input type="checkbox" id="weekendOnly" checked /> Weekend only
+      </label>
+      <label>
+        Date Range:
+        <select id="dateRange">
+          <option value="30">Next 30 days</option>
+          <option value="60">Next 60 days</option>
+          <option value="90">Next 90 days</option>
+          <option value="180">Next 6 months</option>
+          <option value="all">All future dates</option>
+        </select>
+      </label>
+      <label>
+        Sort by:
+        <select id="sortBy">
+          <option value="date">Date</option>
+          <option value="site">Site</option>
+        </select>
+      </label>
+      <label>
+        Direction:
+        <select id="sortDir">
+          <option value="asc">Ascending</option>
+          <option value="desc">Descending</option>
+        </select>
+      </label>
+      <button id="apply">Apply</button>
+      <button id="export">Export CSV</button>
+      <button id="adminScraping" style="background: #7c3aed; margin-left: auto; display: none;">🔧 Admin Scraping</button>
+    </div>
+    <div class="card" style="background: #eef2ff; border-left: 4px solid #4c51bf; padding: 12px 16px;">
+      <strong>ℹ️ Note:</strong> Click "View" links to go to the ReserveCalifornia booking page. You'll need to manually select the dates shown below, as direct booking links are not supported by their website.
+    </div>
+    <div id="summary" class="summary" style="display:none"></div>
+    <div id="content"></div>
+    <div class="pager" style="display: none;">
+      <button id="prev">Prev</button>
+      <span id="pageInfo"></span>
+      <button id="next">Next</button>
+    </div>
+  </div>
+
+  <!-- Preferences Modal -->
+  <div id="preferencesModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Alert Preferences</h2>
+        <button class="close-btn" onclick="closePreferences()">✕ Close</button>
+      </div>
+
+      <div class="pref-form">
+        <h3 style="margin-top: 0;">Add New Preference</h3>
+        <div class="form-row">
+          <label>
+            Park
+            <select id="prefPark">
+              <option value="">All Parks</option>
+            </select>
+          </label>
+          <label>
+            Frequency
+            <select id="prefFrequency">
+              <option value="immediate">Immediate</option>
+              <option value="daily_digest">Daily Digest</option>
+              <option value="weekly_digest">Weekly Digest</option>
+            </select>
+          </label>
+        </div>
+        <div class="form-row">
+          <label>
+            Start Date (optional)
+            <input type="date" id="prefStartDate" />
+          </label>
+          <label>
+            End Date (optional)
+            <input type="date" id="prefEndDate" />
+          </label>
+        </div>
+        <label>
+          <input type="checkbox" id="prefWeekendOnly" checked /> Weekend availability only
+        </label>
+        <button onclick="savePreference()">Add Preference</button>
+      </div>
+
+      <h3>Current Preferences</h3>
+      <div id="preferencesTableContainer"></div>
+    </div>
+  </div>
+
+
+  <script>
+    let state = { parkId: '', weekendOnly: true, dateRange: '30', page: 1, pageSize: 9999, sortBy: 'date', sortDir: 'asc' };
+
+    let allParks = [];
+
+    async function loadParks() {
+      const res = await fetch('/api/parks');
+      const text = await res.text();
+      let json = {};
+      try { json = text ? JSON.parse(text) : {}; } catch (_) { json = {}; }
+      const parks = json.parks || [];
+      allParks = parks;
+      const select = document.getElementById('park');
+      select.innerHTML = '<option value="">All parks</option>' + parks.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+      
+      // Also populate preferences park dropdown
+      const prefSelect = document.getElementById('prefPark');
+      if (prefSelect) {
+        prefSelect.innerHTML = '<option value="">All Parks</option>' + parks.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+      }
+    }
+
+    function qs() {
+      const q = new URLSearchParams();
+      if (state.parkId) q.set('parkId', state.parkId);
+      if (state.weekendOnly) q.set('weekendOnly', '1');
+      if (state.dateRange && state.dateRange !== 'all') q.set('dateRange', state.dateRange);
+      q.set('page', String(state.page));
+      q.set('pageSize', String(state.pageSize));
+      q.set('sortBy', state.sortBy);
+      q.set('sortDir', state.sortDir);
+      return q.toString();
+    }
+
+    function hasWeekend(dates) {
+      const set = new Set(dates);
+      for (const d of dates) {
+        const ts = Date.parse(d);
+        if (!isNaN(ts)) {
+          const dow = new Date(ts).getDay();
+          if (dow === 5) {
+            const sat = new Date(ts + 24*60*60*1000).toISOString().slice(0,10);
+            if (set.has(d) && set.has(sat)) return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    function renderSummary(data) {
+      const box = document.getElementById('summary');
+      if (!data || data.length === 0) {
+        box.style.display = 'none';
+        box.innerHTML = '';
+        return;
+      }
+      
+      // Build filter summary
+      const filters = [];
+      
+      // Park filter
+      const parkSelect = document.getElementById('park');
+      const selectedPark = parkSelect.options[parkSelect.selectedIndex].text;
+      filters.push(`<strong>Park:</strong> ${selectedPark}`);
+      
+      // Weekend only
+      filters.push(`<strong>Type:</strong> ${state.weekendOnly ? 'Weekend only' : 'All dates'}`);
+      
+      // Date range
+      const dateRangeSelect = document.getElementById('dateRange');
+      const dateRangeText = dateRangeSelect.options[dateRangeSelect.selectedIndex].text;
+      filters.push(`<strong>Date Range:</strong> ${dateRangeText}`);
+      
+      // Sort
+      const sortBySelect = document.getElementById('sortBy');
+      const sortDirSelect = document.getElementById('sortDir');
+      const sortByText = sortBySelect.options[sortBySelect.selectedIndex].text;
+      const sortDirText = sortDirSelect.options[sortDirSelect.selectedIndex].text;
+      filters.push(`<strong>Sort:</strong> ${sortByText} (${sortDirText})`);
+      
+      const filterSummary = filters.join(' | ');
+      
+      // Build results summary
+      const lines = data.map(p => {
+        const total = p.sites.length;
+        if (state.weekendOnly) {
+          return `${p.park}: ${total} weekend-capable site(s)`;
+        }
+        return `${p.park}: ${total} site(s)`;
+      }).join('</li><li>');
+      
+      box.innerHTML = `
+        <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #e2e8f0;">
+          <strong>Search Filters:</strong><br>
+          <span style="font-size: 13px; color: #4a5568;">${filterSummary}</span>
+        </div>
+        <strong>Results</strong>
+        <ul><li>${lines}</li></ul>
+      `;
+      box.style.display = '';
+    }
+
+    async function loadData() {
+      const res = await fetch('/api/availability/latest?' + qs());
+      const container = document.getElementById('content');
+      document.getElementById('pageInfo').textContent = `Page ${state.page}`;
+      if (!res.ok) {
+        document.getElementById('summary').style.display = 'none';
+        container.innerHTML = '<div class="card">Failed to load availability.</div>';
+        return;
+      }
+      const text = await res.text();
+      let json = {};
+      try { json = text ? JSON.parse(text) : {}; } catch (_) { json = {}; }
+      const data = json.data || [];
+      renderSummary(data);
+      if (data.length === 0) {
+        container.innerHTML = '<div class="card"><span class="empty">No upcoming availability found.</span></div>';
+        return;
+      }
+      // Group by weekend if weekend-only is enabled
+      if (state.weekendOnly) {
+        container.innerHTML = data.map(park => {
+          // Group sites by weekend dates
+          const byWeekend = {};
+          
+          park.sites.forEach(site => {
+            const dates = site.dates || [];
+            const dateSet = new Set(dates);
+            
+            // Find all Friday-Saturday pairs
+            // JavaScript getDay(): 0=Sunday, 1=Monday, ..., 5=Friday, 6=Saturday
+            dates.forEach(d => {
+              const dateObj = new Date(d + 'T00:00:00'); // Force local timezone
+              const dow = dateObj.getDay();
+              
+              if (dow === 5) { // Friday
+                const fri = d;
+                const nextDay = new Date(dateObj);
+                nextDay.setDate(nextDay.getDate() + 1);
+                const sat = nextDay.toISOString().split('T')[0];
+                
+                if (dateSet.has(sat)) {
+                  const key = `${fri}|${sat}`;
+                  if (!byWeekend[key]) {
+                    byWeekend[key] = {
+                      fri: fri,
+                      sat: sat,
+                      sites: []
+                    };
+                  }
+                  byWeekend[key].sites.push(site);
+                }
+              }
+            });
+          });
+          
+          // Sort weekends by date
+          const sortedWeekends = Object.values(byWeekend).sort((a, b) => a.fri.localeCompare(b.fri));
+          
+          if (sortedWeekends.length === 0) {
+            return `<div class="card"><div class="park">${park.park}</div><div class="empty">No weekend availability found.</div></div>`;
+          }
+          
+          const weekendSections = sortedWeekends.map(weekend => {
+            const friFormatted = new Date(weekend.fri + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            const satFormatted = new Date(weekend.sat + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+            
+            // Group sites by facility
+            const byFacility = {};
+            weekend.sites.forEach(s => {
+              const facilityName = s.facility_name || 'Unknown Facility';
+              if (!byFacility[facilityName]) {
+                byFacility[facilityName] = [];
+              }
+              byFacility[facilityName].push(s);
+            });
+            
+            // Build facility sections with booking links
+            const facilitySections = Object.keys(byFacility).sort().map(facilityName => {
+              const sites = byFacility[facilityName];
+              const siteNumbers = sites.map(s => s.site_number).join(', ');
+              
+              // Link to park page (ReserveCalifornia doesn't support deep linking with dates)
+              const parkNumber = park.park_number || '712'; // fallback to San Onofre
+              const bookUrl = `https://reservecalifornia.com/Web/Default.aspx#!park/${parkNumber}`;
+              
+              return `
+                <div style="margin-left: 16px; margin-bottom: 8px;">
+                  <div style="font-weight: 500; color: #059669; font-size: 14px;">
+                    ${facilityName} (${sites.length} sites)
+                    <a href="${bookUrl}" target="_blank" style="margin-left: 8px; font-size: 12px; color: #2563eb; text-decoration: none;">→ View</a>
+                  </div>
+                  <div style="font-size: 13px; color: #6b7280; margin-left: 8px;">${siteNumbers}</div>
+                </div>
+              `;
+            }).join('');
+            
+            return `
+              <div style="margin-bottom: 20px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
+                <div style="font-weight: 600; color: #2563eb; margin-bottom: 8px;">
+                  📅 ${friFormatted} - ${satFormatted}
+                </div>
+                <div style="font-size: 14px; color: #4b5563; margin-bottom: 8px;">${weekend.sites.length} sites available</div>
+                ${facilitySections}
+              </div>
+            `;
+          }).join('');
+          
+          return `<div class="card"><div class="park">${park.park}</div>${weekendSections}</div>`;
+        }).join('');
+      } else {
+        // Original view: group by site
+        container.innerHTML = data.map(park => {
+          const sites = park.sites.map(s => {
+            const dates = (s.dates || []).join(', ');
+            const type = s.site_type ? `<span class="badge">${s.site_type}</span>` : '';
+            return `<div class="site"><div>Site ${s.site_number} ${type}</div><div class="dates">${dates}</div></div>`;
+          }).join('');
+          return `<div class="card"><div class="park">${park.park}</div>${sites || '<div class="empty">No sites available.</div>'}</div>`;
+        }).join('');
+      }
+    }
+
+    document.getElementById('apply').addEventListener('click', () => {
+      state.parkId = document.getElementById('park').value;
+      state.weekendOnly = document.getElementById('weekendOnly').checked;
+      state.dateRange = document.getElementById('dateRange').value;
+      state.sortBy = document.getElementById('sortBy').value;
+      state.sortDir = document.getElementById('sortDir').value;
+      state.page = 1;
+      loadData();
+    });
+    document.getElementById('prev').addEventListener('click', () => {
+      if (state.page > 1) { state.page--; loadData(); }
+    });
+    document.getElementById('next').addEventListener('click', () => {
+      state.page++; loadData();
+    });
+    document.getElementById('export').addEventListener('click', () => {
+      const url = '/api/availability/export.csv?' + qs();
+      window.open(url, '_blank');
+    });
+
+    
+    // Removed checkNow functionality - moved to admin page
+    /*
+    document.getElementById('checkNow').addEventListener('click', () => {
+      const btn = document.getElementById('checkNow');
+      const stopBtn = document.getElementById('stopCheck');
+      const status = document.getElementById('checkStatus');
+      
+      btn.disabled = true;
+      btn.style.display = 'none';
+      stopBtn.style.display = 'inline-block';
+      status.style.display = 'block';
+      status.innerHTML = '🔄 Starting availability check...<br>';
+      
+      // Pass user selections to scraper
+      const parkId = document.getElementById('park').value;
+      const weekendOnly = document.getElementById('weekendOnly').checked;
+      const dateRange = document.getElementById('dateRange').value;
+      
+      const params = new URLSearchParams();
+      if (parkId) params.set('parkId', parkId);
+      if (weekendOnly) params.set('weekendOnly', '1');
+      if (dateRange) params.set('dateRange', dateRange);
+      
+      const url = `/api/check-now?${params.toString()}`;
+      
+      // Use EventSource for Server-Sent Events
+      const eventSource = new EventSource(url);
+      currentEventSource = eventSource;
+      const messages = [];
+      
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          
+          if (data.type === 'started') {
+            messages.push(`<div style="color: #2563eb;">${data.message}</div>`);
+          } else if (data.type === 'info') {
+            messages.push(`<div style="color: #4b5563;">${data.message}</div>`);
+          } else if (data.type === 'progress') {
+            messages.push(`<div style="color: #2563eb; margin-top: 8px;"><strong>${data.park}</strong></div>`);
+          } else if (data.type === 'month_progress') {
+            messages.push(`<div style="color: #6b7280; margin-left: 16px;">${data.message} (${data.progress})</div>`);
+          } else if (data.type === 'park_complete') {
+            const icon = data.weekendFound ? '✅' : '❌';
+            messages.push(`<div style="margin-left: 16px;">${icon} ${data.message}</div>`);
+          } else if (data.type === 'debug') {
+            console.log('DEBUG:', data.message);
+            messages.push(`<div style="color: #6b7280; font-size: 12px; margin-left: 16px;">🔍 ${data.message}</div>`);
+          } else if (data.type === 'error') {
+            console.log('Error received:', data.message);
+            messages.push(`<div style="color: #e53e3e; margin-left: 16px;">${data.message}</div>`);
+            
+            // Check if it's an authentication error
+            if (data.message && (data.message.includes('Unauthorized') || data.message.includes('not logged in'))) {
+              console.log('Detected unauthorized - redirecting...');
+              eventSource.close();
+              currentEventSource = null;
+              setTimeout(() => {
+                alert('Your session has expired. Redirecting to login page...');
+                window.location.href = '/';
+              }, 2000);
+              return;
+            }
+          } else if (data.type === 'completed') {
+            messages.push(`<div style="color: #059669; margin-top: 12px; font-weight: bold;">✅ Check complete!</div>`);
+            
+            // Close the EventSource
+            eventSource.close();
+            currentEventSource = null;
+            
+            // Reload data after successful check
+            setTimeout(() => {
+              loadData();
+              status.style.display = 'none';
+            }, 3000);
+            
+            btn.disabled = false;
+            btn.style.display = 'inline-block';
+            btn.textContent = 'Check Now';
+            document.getElementById('stopCheck').style.display = 'none';
+          }
+          
+          status.innerHTML = messages.join('');
+          status.scrollTop = status.scrollHeight; // Auto-scroll to bottom
+        } catch (e) {
+          console.error('Error parsing SSE message:', e);
+        }
+      };
+      
+      eventSource.onerror = (error) => {
+        console.error('EventSource error:', error);
+        eventSource.close();
+        currentEventSource = null;
+        
+        // Check if we're still authenticated
+        fetch('/api/me')
+          .then(res => {
+            if (!res.ok) {
+              // Session expired - redirect to landing page
+              alert('Your session has expired. Redirecting to login page...');
+              window.location.href = '/';
+            } else {
+              // Other error - show generic message
+              status.innerHTML += '<div style="color: #e53e3e; margin-top: 8px;">❌ Connection error occurred</div>';
+              btn.disabled = false;
+              btn.style.display = 'inline-block';
+              btn.textContent = 'Check Now';
+              document.getElementById('stopCheck').style.display = 'none';
+            }
+          })
+          .catch(() => {
+            // Network error
+            status.innerHTML += '<div style="color: #e53e3e; margin-top: 8px;">❌ Connection error occurred</div>';
+            btn.disabled = false;
+            btn.style.display = 'inline-block';
+            btn.textContent = 'Check Now';
+            document.getElementById('stopCheck').style.display = 'none';
+          });
+      };
+    });
+    
+    // Stop button handler
+    document.getElementById('stopCheck').addEventListener('click', () => {
+      if (currentEventSource) {
+        currentEventSource.close();
+        currentEventSource = null;
+        
+        const status = document.getElementById('checkStatus');
+        status.innerHTML += '<div style="color: #f59e0b; margin-top: 8px; font-weight: bold;">⏹️ Stopped by user</div>';
+        
+        const btn = document.getElementById('checkNow');
+        const stopBtn = document.getElementById('stopCheck');
+        btn.disabled = false;
+        btn.style.display = 'inline-block';
+        stopBtn.style.display = 'none';
+        
+        // Reload data to show what was found
+        setTimeout(() => {
+          loadData();
+        }, 1000);
+      }
+    });
+    */
+
+    // Auth functions
+    async function checkAuth() {
+      try {
+        console.log('Checking authentication...');
+        const res = await fetch('/api/me');
+        console.log('Auth response status:', res.status);
+        
+        if (res.ok) {
+          const response = await res.json();
+          console.log('Auth response data:', response);
+          const user = response.user;
+          
+          document.getElementById('userInfo').textContent = `Welcome, ${user.email}`;
+          document.getElementById('userInfo').style.display = 'inline';
+          document.getElementById('loginBtn').style.display = 'none';
+          document.getElementById('registerBtn').style.display = 'none';
+          document.getElementById('preferencesBtn').style.display = 'inline';
+          document.getElementById('logoutBtn').style.display = 'inline';
+          
+          // Show admin button for admin users
+          if (user.role === 'admin') {
+            document.getElementById('adminScraping').style.display = 'inline-block';
+          }
+          
+          console.log('User logged in successfully:', user.email);
+        } else {
+          // Not logged in - show login buttons
+          console.log('User not logged in, showing auth buttons');
+          showAuthButtons();
+        }
+      } catch (e) {
+        // Network error - show login buttons
+        console.error('Auth check error:', e);
+        showAuthButtons();
+      }
+    }
+    
+    // Helper to handle 401 responses globally
+    function handleUnauthorized() {
+      alert('Your session has expired. Please log in again.');
+      window.location.href = '/';
+    }
+    
+    // Wrapper for fetch that handles 401 globally
+    async function fetchWithAuth(url, options = {}) {
+      const res = await fetch(url, options);
+      if (res.status === 401) {
+        handleUnauthorized();
+        throw new Error('Unauthorized');
+      }
+      return res;
+    }
+
+    function showAuthButtons() {
+      document.getElementById('userInfo').style.display = 'none';
+      document.getElementById('loginBtn').style.display = 'inline';
+      document.getElementById('registerBtn').style.display = 'inline';
+      document.getElementById('preferencesBtn').style.display = 'none';
+      document.getElementById('logoutBtn').style.display = 'none';
+    }
+
+    // Preferences functions
+    async function openPreferences() {
+      document.getElementById('preferencesModal').classList.add('show');
+      await loadPreferences();
+    }
+
+    function closePreferences() {
+      document.getElementById('preferencesModal').classList.remove('show');
+    }
+
+    async function loadPreferences() {
+      try {
+        const res = await fetchWithAuth('/api/preferences');
+        const data = await res.json();
+        const prefs = data.preferences || [];
+        
+        if (prefs.length === 0) {
+          document.getElementById('preferencesTableContainer').innerHTML = '<p class="empty">No preferences set. Add one above!</p>';
+          return;
+        }
+
+        const table = `
+          <table class="prefs-table">
+            <thead>
+              <tr>
+                <th>Park</th>
+                <th>Dates</th>
+                <th>Frequency</th>
+                <th>Weekend Only</th>
+                <th>Enabled</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${prefs.map(p => `
+                <tr>
+                  <td>${p.park_name || '<em>All Parks</em>'}</td>
+                  <td>${p.start_date || p.end_date ? `${p.start_date || '...'} to ${p.end_date || '...'}` : '<em>Any date</em>'}</td>
+                  <td>${p.frequency.replace('_', ' ')}</td>
+                  <td>${p.weekend_only ? '✓ Yes' : '✗ No'}</td>
+                  <td>
+                    <label class="toggle-switch">
+                      <input type="checkbox" ${p.enabled ? 'checked' : ''} onchange="togglePreference(${p.id})">
+                      <span class="slider"></span>
+                    </label>
+                  </td>
+                  <td>
+                    <button class="btn-sm btn-danger" onclick="deletePreference(${p.id})">Delete</button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+        document.getElementById('preferencesTableContainer').innerHTML = table;
+      } catch (e) {
+        console.error('Error loading preferences:', e);
+        document.getElementById('preferencesTableContainer').innerHTML = '<p style="color: #e53e3e;">Error loading preferences</p>';
+      }
+    }
+
+    async function savePreference() {
+      const parkId = document.getElementById('prefPark').value || null;
+      const startDate = document.getElementById('prefStartDate').value || null;
+      const endDate = document.getElementById('prefEndDate').value || null;
+      const frequency = document.getElementById('prefFrequency').value;
+      const weekendOnly = document.getElementById('prefWeekendOnly').checked;
+
+      try {
+        const res = await fetchWithAuth('/api/preferences', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            park_id: parkId,
+            start_date: startDate,
+            end_date: endDate,
+            frequency: frequency,
+            weekend_only: weekendOnly,
+            enabled: true
+          })
+        });
+
+        if (res.ok) {
+          // Clear form
+          document.getElementById('prefPark').value = '';
+          document.getElementById('prefStartDate').value = '';
+          document.getElementById('prefEndDate').value = '';
+          document.getElementById('prefFrequency').value = 'immediate';
+          document.getElementById('prefWeekendOnly').checked = true;
+          
+          // Reload preferences
+          await loadPreferences();
+        } else {
+          const err = await res.json();
+          alert('Error: ' + (err.error || 'Failed to save preference'));
+        }
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    async function togglePreference(id) {
+      try {
+        await fetchWithAuth(`/api/preferences/${id}/toggle`, { method: 'POST' });
+        await loadPreferences();
+      } catch (e) {
+        console.error('Error toggling preference:', e);
+      }
+    }
+
+    async function deletePreference(id) {
+      if (!confirm('Delete this preference?')) return;
+      
+      try {
+        await fetchWithAuth(`/api/preferences/${id}`, { method: 'DELETE' });
+        await loadPreferences();
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    async function register() {
+      const email = prompt('Enter your email address:');
+      if (!email) return;
+      
+      try {
+        const res = await fetch('/api/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        const text = await res.text();
+        let result = {};
+        try { result = text ? JSON.parse(text) : {}; } catch (_) {}
+        if (res.ok) {
+          alert('Registration successful! Check your email for verification link.');
+        } else {
+          alert('Error: ' + (result.error || 'Registration failed'));
+        }
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    async function login() {
+      const email = prompt('Enter your email address:');
+      if (!email) return;
+      
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        const text = await res.text();
+        let result = {};
+        try { result = text ? JSON.parse(text) : {}; } catch (_) {}
+        if (res.ok) {
+          alert('Login link sent! Check your email.');
+        } else {
+          alert('Error: ' + (result.error || 'Login failed'));
+        }
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    async function logout() {
+      try {
+        await fetch('/api/logout', { method: 'POST' });
+        window.location.href = '/landing.html';
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+
+    // Event listeners
+    document.getElementById('registerBtn').addEventListener('click', register);
+    document.getElementById('loginBtn').addEventListener('click', login);
+    document.getElementById('logoutBtn').addEventListener('click', logout);
+    document.getElementById('preferencesBtn').addEventListener('click', openPreferences);
+    document.getElementById('adminScraping').addEventListener('click', () => window.location.href = '/admin-scraping.html');
+    
+    // Close modal when clicking outside
+    document.getElementById('preferencesModal').addEventListener('click', (e) => {
+      if (e.target.id === 'preferencesModal') {
+        closePreferences();
+      }
+    });
+    
+
+    // Initialize
+    checkAuth();
+    loadParks().then(loadData);
+
+    // Display session ID for debugging
+    function getCookie(name) {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(';').shift();
+      return null;
+    }
+    const sessionId = getCookie('PHPSESSID');
+    if (sessionId) {
+      const debugDiv = document.createElement('div');
+      debugDiv.style.cssText = 'position: fixed; bottom: 0; left: 0; right: 0; background: #1a202c; color: #a0aec0; padding: 8px 16px; font-size: 11px; font-family: monospace; text-align: center; z-index: 1000;';
+      debugDiv.innerHTML = `Session ID: ${sessionId} <button onclick="navigator.clipboard.writeText('${sessionId}'); this.textContent='Copied!'" style="margin-left: 8px; padding: 2px 8px; background: #2d3748; border: none; color: #fff; cursor: pointer; border-radius: 4px;">Copy</button>`;
+      document.body.appendChild(debugDiv);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Scraping - CampsiteAgent</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: #4c51bf;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .back-btn {
+            background: #e2e8f0;
+            color: #4a5568;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .back-btn:hover {
+            background: #cbd5e0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+
+        .scraping-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .control-group label {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #4a5568;
+        }
+
+        .control-group select,
+        .control-group input {
+            padding: 0.75rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        .control-group select:focus,
+        .control-group input:focus {
+            outline: none;
+            border-color: #4c51bf;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 2rem;
+        }
+
+        button {
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-width: 150px;
+        }
+
+        .btn-primary {
+            background: #4c51bf;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #434190;
+        }
+
+        .btn-danger {
+            background: #e53e3e;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c53030;
+        }
+
+        .btn-secondary {
+            background: #7c3aed;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #6d28d9;
+        }
+
+        .btn-success {
+            background: #059669;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #047857;
+        }
+
+        button:disabled {
+            background: #a0aec0;
+            cursor: not-allowed;
+        }
+
+        .status-display {
+            background: #f7fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1rem;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        .status-hidden {
+            display: none;
+        }
+
+        .log-entry {
+            margin-bottom: 0.5rem;
+            padding: 0.25rem 0;
+        }
+
+        .log-debug { color: #718096; }
+        .log-info { color: #38a169; }
+        .log-warning { color: #d69e2e; }
+        .log-error { color: #e53e3e; font-weight: 600; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .stat-card {
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #4c51bf;
+        }
+
+        .stat-label {
+            color: #718096;
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+        }
+
+        .admin-only {
+            background: #fed7d7;
+            border: 1px solid #feb2b2;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .admin-only h2 {
+            color: #c53030;
+            margin-bottom: 0.5rem;
+        }
+
+        .admin-only p {
+            color: #742a2a;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔧 Admin Scraping Control</h1>
+        <div class="header-actions">
+            <span id="userInfo" style="display: none;"></span>
+            <a href="/dashboard.html" class="back-btn">← Back to Dashboard</a>
+            <button id="logoutBtn" style="background: #e53e3e; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; display: none;">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="adminCheck" class="admin-only">
+            <h2>🔒 Admin Access Required</h2>
+            <p>Checking your permissions...</p>
+        </div>
+
+        <div id="adminContent" style="display: none;">
+            <div class="card">
+                <h2 style="margin-bottom: 1.5rem; color: #4c51bf;">🎯 Scraping Configuration</h2>
+                
+                <div class="scraping-controls">
+                    <div class="control-group">
+                        <label for="parkSelect">Parks to Scrape:</label>
+                        <select id="parkSelect" multiple size="8">
+                            <option value="">Loading parks...</option>
+                        </select>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="selectAllParks">
+                            <label for="selectAllParks">Select All Active Parks</label>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="dateRange">Date Range:</label>
+                        <select id="dateRange">
+                            <option value="30">Next 30 days (2 months)</option>
+                            <option value="60">Next 60 days (3 months)</option>
+                            <option value="90">Next 90 days (4 months)</option>
+                            <option value="120">Next 120 days (5 months)</option>
+                            <option value="180">Next 180 days (6 months)</option>
+                            <option value="365">Next 365 days (12 months)</option>
+                        </select>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="weekendOnly">Date Filter:</label>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="weekendOnly" checked>
+                            <label for="weekendOnly">Weekend Only (Fri-Sun)</label>
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="includeHolidays">
+                            <label for="includeHolidays">Include Holiday Weekends</label>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="scrapingMode">Scraping Mode:</label>
+                        <select id="scrapingMode">
+                            <option value="normal">Normal (Standard Speed)</option>
+                            <option value="fast">Fast (Higher Speed)</option>
+                            <option value="slow">Slow (Gentle on API)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button id="startScraping" class="btn-primary">🚀 Start Scraping</button>
+                    <button id="stopScraping" class="btn-danger" style="display: none;">⏹️ Stop Scraping</button>
+                    <button id="syncFacilities" class="btn-secondary">🏕️ Sync Facilities</button>
+                    <button id="manageFacilities" class="btn-success">⚙️ Manage Facilities</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2 style="margin-bottom: 1rem; color: #4c51bf;">📊 Scraping Status</h2>
+                <div id="scrapingStatus" class="status-display status-hidden">
+                    Ready to start scraping...
+                </div>
+                
+                <div id="scrapingStats" class="stats-grid" style="display: none;">
+                    <div class="stat-card">
+                        <div class="stat-value" id="parksProcessed">0</div>
+                        <div class="stat-label">Parks Processed</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="sitesFound">0</div>
+                        <div class="stat-label">Sites Found</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="errorsCount">0</div>
+                        <div class="stat-label">Errors</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="elapsedTime">0s</div>
+                        <div class="stat-label">Elapsed Time</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allParks = [];
+        let isScraping = false;
+        let eventSource = null;
+        let startTime = null;
+        let stats = {
+            parksProcessed: 0,
+            sitesFound: 0,
+            errorsCount: 0
+        };
+
+        // Check authentication and admin status
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/me');
+                if (res.ok) {
+                    const response = await res.json();
+                    const user = response.user;
+                    
+                    if (user.role === 'admin') {
+                        document.getElementById('userInfo').textContent = `Welcome, ${user.email}`;
+                        document.getElementById('userInfo').style.display = 'inline';
+                        document.getElementById('logoutBtn').style.display = 'inline';
+                        document.getElementById('adminCheck').style.display = 'none';
+                        document.getElementById('adminContent').style.display = 'block';
+                        loadParks();
+                    } else {
+                        document.getElementById('adminCheck').innerHTML = `
+                            <h2>❌ Access Denied</h2>
+                            <p>You must be an admin to access this page.</p>
+                        `;
+                    }
+                } else {
+                    window.location.href = '/';
+                }
+            } catch (e) {
+                window.location.href = '/';
+            }
+        }
+
+        // Load parks for selection
+        async function loadParks() {
+            try {
+                const res = await fetch('/api/parks');
+                const data = await res.json();
+                allParks = data.parks || [];
+                
+                const parkSelect = document.getElementById('parkSelect');
+                parkSelect.innerHTML = '';
+                
+                allParks.forEach(park => {
+                    if (park.active) {
+                        const option = document.createElement('option');
+                        option.value = park.id;
+                        option.textContent = `${park.name} (${park.park_number || park.external_id})`;
+                        parkSelect.appendChild(option);
+                    }
+                });
+                
+                if (parkSelect.children.length === 0) {
+                    parkSelect.innerHTML = '<option value="">No active parks found</option>';
+                }
+            } catch (e) {
+                console.error('Error loading parks:', e);
+                document.getElementById('parkSelect').innerHTML = '<option value="">Error loading parks</option>';
+            }
+        }
+
+        // Start scraping
+        async function startScraping() {
+            if (isScraping) return;
+            
+            const selectedParks = Array.from(document.getElementById('parkSelect').selectedOptions).map(o => o.value);
+            const dateRange = document.getElementById('dateRange').value;
+            const weekendOnly = document.getElementById('weekendOnly').checked;
+            const scrapingMode = document.getElementById('scrapingMode').value;
+            
+            if (selectedParks.length === 0) {
+                alert('Please select at least one park to scrape.');
+                return;
+            }
+            
+            isScraping = true;
+            startTime = Date.now();
+            stats = { parksProcessed: 0, sitesFound: 0, errorsCount: 0 };
+            
+            // Update UI
+            document.getElementById('startScraping').style.display = 'none';
+            document.getElementById('stopScraping').style.display = 'inline-block';
+            document.getElementById('scrapingStatus').classList.remove('status-hidden');
+            document.getElementById('scrapingStats').style.display = 'grid';
+            
+            // Build URL
+            const params = new URLSearchParams();
+            if (selectedParks.length === 1) {
+                params.set('parkId', selectedParks[0]);
+            }
+            params.set('weekendOnly', weekendOnly ? '1' : '0');
+            params.set('dateRange', dateRange);
+            
+            const url = `/api/check-now?${params.toString()}`;
+            
+            // Start event source
+            eventSource = new EventSource(url);
+            
+            eventSource.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    // Handle different message types
+                    if (data.type === 'completed') {
+                        addLogEntry('info', '✅ Scraping completed successfully');
+                        stopScraping();
+                        return;
+                    }
+                    
+                    // Only log if there's a message
+                    if (data.message) {
+                        addLogEntry(data.type || 'info', data.message);
+                    }
+                    
+                    // Update stats
+                    if (data.type === 'info' && data.message && data.message.includes('Checking') && data.message.includes('...')) {
+                        stats.parksProcessed++;
+                    }
+                    if (data.type === 'error') {
+                        stats.errorsCount++;
+                    }
+                    if (data.type === 'park_complete' && data.message && data.message.includes('sites found')) {
+                        const match = data.message.match(/(\d+)\s+sites found/);
+                        if (match) {
+                            stats.sitesFound += parseInt(match[1]);
+                        }
+                    }
+                    updateStats();
+                } catch (e) {
+                    addLogEntry('error', `Failed to parse log entry: ${event.data}`);
+                }
+            };
+            
+            eventSource.onerror = function(event) {
+                // Only show error if we're still scraping (not completed)
+                if (isScraping) {
+                    addLogEntry('error', '❌ Connection error - scraping stopped');
+                    stopScraping();
+                }
+            };
+            
+            eventSource.onopen = function(event) {
+                addLogEntry('info', '✅ Connected to scraping service');
+            };
+        }
+
+        // Stop scraping
+        function stopScraping() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+            
+            isScraping = false;
+            
+            // Update UI
+            document.getElementById('startScraping').style.display = 'inline-block';
+            document.getElementById('stopScraping').style.display = 'none';
+            
+            addLogEntry('info', '⏹️ Scraping stopped');
+        }
+
+        // Add log entry
+        function addLogEntry(type, message) {
+            const statusDisplay = document.getElementById('scrapingStatus');
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${timestamp}] ${message}`;
+            statusDisplay.appendChild(entry);
+            statusDisplay.scrollTop = statusDisplay.scrollHeight;
+        }
+
+        // Update statistics
+        function updateStats() {
+            document.getElementById('parksProcessed').textContent = stats.parksProcessed;
+            document.getElementById('sitesFound').textContent = stats.sitesFound;
+            document.getElementById('errorsCount').textContent = stats.errorsCount;
+            
+            if (startTime) {
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                document.getElementById('elapsedTime').textContent = `${elapsed}s`;
+            }
+        }
+
+        // Sync facilities
+        async function syncFacilities() {
+            const btn = document.getElementById('syncFacilities');
+            const originalText = btn.textContent;
+            
+            btn.disabled = true;
+            btn.textContent = '🔄 Syncing...';
+            
+            try {
+                const res = await fetchWithAuth('/api/admin/sync-facilities', { method: 'POST' });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    alert(`✅ ${data.message}`);
+                } else {
+                    alert('❌ Error: ' + (data.error || 'Failed to sync facilities'));
+                }
+            } catch (e) {
+                alert('❌ Error: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        }
+
+        // Manage facilities
+        function manageFacilities() {
+            window.open('/dashboard.html#facilities', '_blank');
+        }
+
+        // Select all parks
+        document.getElementById('selectAllParks').addEventListener('change', function() {
+            const parkSelect = document.getElementById('parkSelect');
+            const options = parkSelect.options;
+            
+            for (let i = 0; i < options.length; i++) {
+                options[i].selected = this.checked;
+            }
+        });
+
+        // Event listeners
+        document.getElementById('startScraping').addEventListener('click', startScraping);
+        document.getElementById('stopScraping').addEventListener('click', stopScraping);
+        document.getElementById('syncFacilities').addEventListener('click', syncFacilities);
+        document.getElementById('manageFacilities').addEventListener('click', manageFacilities);
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            try {
+                await fetch('/api/logout', { method: 'POST' });
+                window.location.href = '/landing.html';
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        });
+
+        // Helper function for authenticated requests
+        async function fetchWithAuth(url, options = {}) {
+            const response = await fetch(url, {
+                ...options,
+                credentials: 'same-origin'
+            });
+            return response;
+        }
+
+        // Initialize
+        checkAuth();
+        
+        // Update stats every second when scraping
+        setInterval(() => {
+            if (isScraping) {
+                updateStats();
+            }
+        }, 1000);
+    </script>
+</body>
+</html>
