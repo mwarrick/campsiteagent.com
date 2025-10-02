@@ -45,10 +45,20 @@ This software is provided under a custom license agreement. By using, copying, m
 
 ## Liability and Warranty
 
-### Disclaimer
-- **No warranty**: This software is provided "as is" without warranty of any kind
-- **No liability**: The authors are not liable for any damages arising from use of this software
-- **Use at your own risk**: You use this software at your own risk and discretion
+### ⚠️ NO WARRANTY - AS-IS
+- **NO WARRANTY**: This software is provided "AS IS" without warranty of any kind
+- **NO LIABILITY**: The authors are not liable for any damages arising from use of this software
+- **NO SUPPORT**: No technical support, bug fixes, or updates are provided
+- **USE AT YOUR OWN RISK**: You use this software at your own risk and discretion
+
+### ❌ NO SUPPORT POLICY
+- **NO technical support provided**
+- **NO bug fixes or updates guaranteed**
+- **NO documentation updates**
+- **NO assistance with setup or deployment**
+- **NO response to issues or questions**
+
+This is a personal project shared for educational purposes only.
 
 ### Indemnification
 - **User responsibility**: You are responsible for your use of this software

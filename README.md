@@ -301,12 +301,19 @@ This project is currently in active development. For contributions:
 
 This project is licensed under a custom license. See the [LICENSE.md](LICENSE.md) file for details.
 
-## 🆘 Support
+## ⚠️ Support Policy
 
-For support and questions:
-- Create an issue on GitHub
-- Check the troubleshooting section above
-- Review the API documentation
+**NO SUPPORT - AS-IS**
+
+This software is provided "AS-IS" without any warranty or support. Use at your own risk.
+
+- No technical support provided
+- No bug fixes or updates guaranteed
+- No documentation updates
+- No assistance with setup or deployment
+- No response to issues or questions
+
+This is a personal project shared for educational purposes only.
 
 ## 🎉 Acknowledgments
 
