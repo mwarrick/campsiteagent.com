@@ -54,12 +54,148 @@
     .pref-form input, .pref-form select { width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 14px; margin-top: 4px; }
     .pref-form button { margin-top: 12px; }
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    
+    /* Mobile Responsive Styles */
+    @media (max-width: 768px) {
+      .container { padding: 0 12px; margin: 16px auto; }
+      
+      header { padding: 12px 16px; }
+      h1 { font-size: 18px; }
+      
+      .controls { 
+        flex-direction: column; 
+        align-items: stretch; 
+        gap: 16px; 
+        padding: 16px; 
+      }
+      
+      .controls label { 
+        display: flex; 
+        flex-direction: column; 
+        gap: 6px; 
+        font-size: 14px; 
+      }
+      
+      .controls select, 
+      .controls input[type="checkbox"] { 
+        width: 100%; 
+        padding: 10px; 
+        font-size: 16px; /* Prevents zoom on iOS */
+        border: 1px solid #cbd5e0;
+        border-radius: 6px;
+      }
+      
+      .controls button { 
+        width: 100%; 
+        padding: 12px; 
+        font-size: 16px;
+        margin: 4px 0;
+      }
+      
+      .card { 
+        padding: 16px; 
+        margin-bottom: 12px; 
+      }
+      
+      .park { 
+        font-size: 16px; 
+        margin-bottom: 12px; 
+      }
+      
+      .site { 
+        flex-direction: column; 
+        align-items: flex-start; 
+        gap: 8px; 
+        padding: 12px 0; 
+      }
+      
+      .modal-content { 
+        width: 95%; 
+        padding: 20px; 
+        margin: 20px; 
+      }
+      
+      .modal-header h2 { 
+        font-size: 20px; 
+      }
+      
+      .prefs-table { 
+        font-size: 14px; 
+      }
+      
+      .prefs-table th, 
+      .prefs-table td { 
+        padding: 8px 4px; 
+      }
+      
+      .form-row { 
+        grid-template-columns: 1fr; 
+        gap: 16px; 
+      }
+      
+      .pref-form input, 
+      .pref-form select { 
+        font-size: 16px; /* Prevents zoom on iOS */
+      }
+      
+      /* Auth section mobile */
+      #authSection { 
+        display: flex; 
+        flex-direction: column; 
+        gap: 8px; 
+        margin-top: 12px; 
+      }
+      
+      #authSection button { 
+        margin-left: 0 !important; 
+        font-size: 14px; 
+        padding: 8px 12px; 
+      }
+      
+      /* Summary mobile */
+      .summary { 
+        padding: 12px; 
+        font-size: 14px; 
+      }
+      
+      /* Pager mobile */
+      .pager { 
+        flex-wrap: wrap; 
+        justify-content: center; 
+        gap: 8px; 
+      }
+      
+      .pager button { 
+        flex: 1; 
+        min-width: 80px; 
+        max-width: 120px; 
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .container { padding: 0 8px; }
+      
+      header { padding: 10px 12px; }
+      h1 { font-size: 16px; }
+      
+      .controls { padding: 12px; }
+      .card { padding: 12px; }
+      
+      .modal-content { 
+        width: 98%; 
+        padding: 16px; 
+        margin: 10px; 
+      }
+      
+      .park { font-size: 15px; }
+      .site { padding: 10px 0; }
+    }
   </style>
 </head>
 <body>
   <header>
     <div style="display: flex; justify-content: space-between; align-items: center;">
-      <h1>Weekend Availability</h1>
+      <h1>CA Parks Campsite Agent</h1>
       <div id="authSection">
         <span id="userInfo" style="display: none;"></span>
         <button id="preferencesBtn" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); display: none;">⚙️ Preferences</button>
@@ -105,6 +241,7 @@
       <button id="apply">Apply</button>
       <button id="export">Export CSV</button>
       <button id="adminScraping" style="background: #7c3aed; margin-left: auto; display: none;">🔧 Admin Scraping</button>
+      <button id="adminUsers" style="background: #059669; margin-left: 8px; display: none;">👥 User Management</button>
     </div>
     <div class="card" style="background: #eef2ff; border-left: 4px solid #4c51bf; padding: 12px 16px;">
       <strong>ℹ️ Note:</strong> Click "View" links to go to the ReserveCalifornia booking page. You'll need to manually select the dates shown below, as direct booking links are not supported by their website.
@@ -248,22 +385,11 @@
       
       const filterSummary = filters.join(' | ');
       
-      // Build results summary
-      const lines = data.map(p => {
-        const total = p.sites.length;
-        if (state.weekendOnly) {
-          return `${p.park}: ${total} weekend-capable site(s)`;
-        }
-        return `${p.park}: ${total} site(s)`;
-      }).join('</li><li>');
-      
       box.innerHTML = `
         <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #e2e8f0;">
           <strong>Search Filters:</strong><br>
           <span style="font-size: 13px; color: #4a5568;">${filterSummary}</span>
         </div>
-        <strong>Results</strong>
-        <ul><li>${lines}</li></ul>
       `;
       box.style.display = '';
     }
@@ -353,11 +479,17 @@
               const parkNumber = park.park_number || '712'; // fallback to San Onofre
               const bookUrl = `https://reservecalifornia.com/Web/Default.aspx#!park/${parkNumber}`;
               
+              // Discovery time label from earliest found_at among sites in this facility group
+              const foundTimes = sites.map(s => s.found_at).filter(Boolean).sort();
+              const foundAt = foundTimes.length ? new Date(foundTimes[0].replace(' ', 'T')) : null;
+              const foundLabel = foundAt ? `Found ${foundAt.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' })} @ ${foundAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}` : '';
+
               return `
                 <div style="margin-left: 16px; margin-bottom: 8px;">
                   <div style="font-weight: 500; color: #059669; font-size: 14px;">
                     ${facilityName} (${sites.length} sites)
                     <a href="${bookUrl}" target="_blank" style="margin-left: 8px; font-size: 12px; color: #2563eb; text-decoration: none;">→ View</a>
+                    ${foundLabel ? `<span style=\"margin-left:8px; font-size:12px; color:#4a5568;\">${foundLabel}</span>` : ''}
                   </div>
                   <div style="font-size: 13px; color: #6b7280; margin-left: 8px;">${siteNumbers}</div>
                 </div>
@@ -574,9 +706,10 @@
           document.getElementById('preferencesBtn').style.display = 'inline';
           document.getElementById('logoutBtn').style.display = 'inline';
           
-          // Show admin button for admin users
+          // Show admin buttons for admin users
           if (user.role === 'admin') {
             document.getElementById('adminScraping').style.display = 'inline-block';
+            document.getElementById('adminUsers').style.display = 'inline-block';
           }
           
           console.log('User logged in successfully:', user.email);
@@ -799,6 +932,7 @@
     document.getElementById('logoutBtn').addEventListener('click', logout);
     document.getElementById('preferencesBtn').addEventListener('click', openPreferences);
     document.getElementById('adminScraping').addEventListener('click', () => window.location.href = '/admin-scraping.html');
+    document.getElementById('adminUsers').addEventListener('click', () => window.location.href = '/admin-users.html');
     
     // Close modal when clicking outside
     document.getElementById('preferencesModal').addEventListener('click', (e) => {

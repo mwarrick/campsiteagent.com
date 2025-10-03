@@ -312,6 +312,182 @@
             border-radius: 6px;
         }
         .btn-link:hover { background: #edf2f7; }
+        
+        /* Mobile Responsive Styles */
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+                padding: 16px;
+            }
+            
+            .header h1 {
+                font-size: 20px;
+                margin-bottom: 8px;
+            }
+            
+            .header-actions {
+                flex-direction: column;
+                width: 100%;
+                gap: 8px;
+            }
+            
+            .back-btn {
+                width: 100%;
+                text-align: center;
+                padding: 10px;
+                font-size: 14px;
+            }
+            
+            .container {
+                padding: 16px;
+            }
+            
+            .card {
+                padding: 16px;
+                margin-bottom: 16px;
+            }
+            
+            .scraping-controls {
+                flex-direction: column;
+                gap: 20px;
+            }
+            
+            .control-group {
+                width: 100%;
+            }
+            
+            .control-group select {
+                font-size: 16px; /* Prevents zoom on iOS */
+                padding: 10px;
+            }
+            
+            .control-group input[type="checkbox"] {
+                transform: scale(1.2);
+                margin-right: 8px;
+            }
+            
+            .control-group label {
+                font-size: 14px;
+                margin-bottom: 8px;
+            }
+            
+            .checkbox-group {
+                margin-top: 12px;
+                padding: 8px;
+                background: #f7fafc;
+                border-radius: 6px;
+            }
+            
+            .btn {
+                width: 100%;
+                padding: 12px;
+                font-size: 16px;
+                margin: 8px 0;
+            }
+            
+            .btn-group {
+                flex-direction: column;
+                gap: 8px;
+            }
+            
+            .log-container {
+                height: 300px;
+                font-size: 13px;
+            }
+            
+            .modal {
+                padding: 16px;
+            }
+            
+            .modal-content {
+                width: 95%;
+                max-height: 90vh;
+                padding: 20px;
+            }
+            
+            .modal-header h3 {
+                font-size: 18px;
+            }
+            
+            .modal-section {
+                margin-bottom: 20px;
+            }
+            
+            .control-group input[type="text"] {
+                font-size: 16px; /* Prevents zoom on iOS */
+                padding: 10px;
+            }
+            
+            .facilities-list {
+                max-height: 300px;
+            }
+            
+            .facility-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+                padding: 12px;
+            }
+            
+            .facility-info {
+                width: 100%;
+            }
+            
+            .facility-actions {
+                width: 100%;
+                justify-content: flex-start;
+            }
+            
+            .parks-list {
+                max-height: 300px;
+            }
+            
+            .park-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+                padding: 12px;
+            }
+            
+            .park-info {
+                width: 100%;
+            }
+            
+            .park-actions {
+                width: 100%;
+                justify-content: flex-start;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .header {
+                padding: 12px;
+            }
+            
+            .header h1 {
+                font-size: 18px;
+            }
+            
+            .container {
+                padding: 12px;
+            }
+            
+            .card {
+                padding: 12px;
+            }
+            
+            .modal-content {
+                width: 98%;
+                padding: 16px;
+            }
+            
+            .log-container {
+                height: 250px;
+                font-size: 12px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -319,6 +495,7 @@
         <h1>🔧 Admin Scraping Control</h1>
         <div class="header-actions">
             <span id="userInfo" style="display: none;"></span>
+            <a href="/admin-users.html" class="back-btn">👥 User Management</a>
             <a href="/dashboard.html" class="back-btn">← Back to Dashboard</a>
             <button id="logoutBtn" style="background: #e53e3e; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; display: none;">Logout</button>
         </div>
@@ -385,6 +562,7 @@
                     <button id="stopScraping" class="btn-danger" style="display: none;">⏹️ Stop Scraping</button>
                     <button id="syncFacilities" class="btn-secondary">🏕️ Sync Facilities</button>
                     <button id="manageFacilities" class="btn-success">⚙️ Manage Facilities</button>
+                    <button id="manageParks" class="btn-secondary">🏞️ Manage Parks</button>
                 </div>
             </div>
 
@@ -431,6 +609,24 @@
                     <button id="deactivateAllFacilities" class="btn-danger" style="padding:.5rem 1rem;">Deactivate All</button>
                 </div>
                 <div id="facilitiesContainer" class="facilities-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Parks Manager Modal -->
+    <div id="parksModal" class="modal-overlay" aria-hidden="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="parksTitle">
+            <div class="modal-header">
+                <h3 id="parksTitle">🏞️ Manage Parks</h3>
+                <button id="closeParks" class="btn-link" aria-label="Close">✖</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-actions" style="flex-wrap: wrap;">
+                    <input id="newParkName" type="text" placeholder="Full Park Name (e.g., Crystal Cove SP)" style="flex:1; min-width:260px; padding:.5rem; border:2px solid #e2e8f0; border-radius:8px;">
+                    <input id="newParkNumber" type="text" placeholder="ReserveCalifornia Park ID (e.g., 1244)" style="width:260px; padding:.5rem; border:2px solid #e2e8f0; border-radius:8px;">
+                    <button id="addParkBtn" class="btn-success" style="padding:.5rem 1rem;">Add Park</button>
+                </div>
+                <div id="parksList" class="facilities-list"></div>
             </div>
         </div>
     </div>
@@ -693,6 +889,8 @@
                 if (!res.ok) throw new Error('Failed to load facilities');
                 const data = await res.json();
                 const facilities = data.facilities || [];
+                const parkMeta = allParks.find(p => String(p.id) === String(parkId));
+                const parkNumber = parkMeta ? (parkMeta.park_number || parkMeta.external_id || '') : '';
                 if (facilities.length === 0) {
                     container.innerHTML = '<div style="padding:1rem; color:#718096;">No facilities found for this park.</div>';
                     return;
@@ -709,7 +907,8 @@
                     const meta = document.createElement('div');
                     meta.style.color = '#718096';
                     meta.style.fontSize = '.85rem';
-                    meta.textContent = `DB ID: ${f.id}`;
+                    // Show ReserveCalifornia identifiers
+                    meta.textContent = `Park #: ${parkNumber} • Facility #: ${f.facility_id}`;
                     left.appendChild(name);
                     left.appendChild(meta);
                     const right = document.createElement('div');
@@ -790,6 +989,7 @@
         document.getElementById('stopScraping').addEventListener('click', stopScraping);
         document.getElementById('syncFacilities').addEventListener('click', syncFacilities);
         document.getElementById('manageFacilities').addEventListener('click', manageFacilities);
+        document.getElementById('manageParks').addEventListener('click', () => openParksModal());
         document.getElementById('closeFacilities').addEventListener('click', closeFacilitiesModal);
         document.getElementById('facilitiesModal').addEventListener('click', (e) => { if (e.target.id === 'facilitiesModal') closeFacilitiesModal(); });
         document.getElementById('facilitiesParkSelect').addEventListener('change', (e) => {
@@ -809,6 +1009,77 @@
             if (!parkId) return;
             const ok = await bulkToggleFacilities(parkId, false);
             if (ok) loadFacilitiesForPark(parkId);
+        });
+
+        // Parks Manager functions
+        function openParksModal() {
+            const overlay = document.getElementById('parksModal');
+            overlay.style.display = 'flex';
+            renderParksList();
+        }
+        function closeParksModal() {
+            document.getElementById('parksModal').style.display = 'none';
+        }
+        document.getElementById('closeParks').addEventListener('click', closeParksModal);
+        document.getElementById('parksModal').addEventListener('click', (e) => { if (e.target.id === 'parksModal') closeParksModal(); });
+        async function renderParksList() {
+            const container = document.getElementById('parksList');
+            container.innerHTML = '<div style="padding:1rem; color:#718096;">Loading parks...</div>';
+            try {
+                const res = await fetch('/api/parks');
+                const data = await res.json();
+                const parks = (data.parks || []).sort((a,b) => a.name.localeCompare(b.name));
+                container.innerHTML = '';
+                parks.forEach(p => {
+                    const row = document.createElement('div');
+                    row.className = 'facility-row';
+                    const left = document.createElement('div');
+                    left.innerHTML = `<div style=\"font-weight:600;\">${p.name}</div><div style=\"color:#718096; font-size:.85rem;\">ID: ${p.id} • Park # ${(p.park_number||p.external_id||'')} • ${p.active ? 'Active' : 'Inactive'}</div>`;
+                    const right = document.createElement('div');
+                    const del = document.createElement('button');
+                    del.className = 'btn-link';
+                    del.style.color = '#e53e3e';
+                    del.textContent = 'Delete';
+                    del.addEventListener('click', async () => {
+                        if (!confirm('Delete this park? You must remove facilities/sites first.')) return;
+                        const r = await fetch(`/api/admin/parks/${p.id}`, { method: 'DELETE', credentials: 'same-origin' });
+                        if (r.ok) renderParksList(); else alert('Failed to delete park');
+                    });
+                    right.appendChild(del);
+                    row.appendChild(left);
+                    row.appendChild(right);
+                    container.appendChild(row);
+                });
+                if (parks.length === 0) {
+                    container.innerHTML = '<div style="padding:1rem; color:#718096;">No parks found.</div>';
+                }
+            } catch (e) {
+                container.innerHTML = '<div style="padding:1rem; color:#e53e3e;">Error loading parks.</div>';
+            }
+        }
+        document.getElementById('addParkBtn').addEventListener('click', async () => {
+            const name = (document.getElementById('newParkName').value||'').trim();
+            const parkNum = (document.getElementById('newParkNumber').value||'').trim();
+            if (!name || !parkNum) { alert('Enter park name and Park ID from ReserveCalifornia.'); return; }
+            try {
+                const res = await fetch('/api/admin/parks', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ name, park_number: parkNum })
+                });
+                if (res.ok) {
+                    document.getElementById('newParkName').value = '';
+                    document.getElementById('newParkNumber').value = '';
+                    await renderParksList();
+                    await loadParks();
+                } else {
+                    const j = await res.json().catch(()=>({}));
+                    alert('Failed to add park' + (j.error ? ': ' + j.error : ''));
+                }
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
         });
         document.getElementById('logoutBtn').addEventListener('click', async () => {
             try {

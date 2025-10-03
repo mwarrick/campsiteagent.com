@@ -13,17 +13,29 @@ class ScraperService
     private RunRepository $runs;
     private SiteRepository $sites;
     private FacilityRepository $facilities;
-    private NotificationService $notify;
+    private ?NotificationService $notify;
     private WeekendDetector $detector;
     private ReserveCaliforniaScraper $rc;
 
-    public function __construct()
+    public function __construct(bool $enableNotifications = true)
     {
         $this->parks = new ParkRepository();
         $this->runs = new RunRepository();
         $this->sites = new SiteRepository();
         $this->facilities = new FacilityRepository();
-        $this->notify = new NotificationService();
+        
+        // Only initialize notification service if enabled and credentials are available
+        if ($enableNotifications && getenv('GOOGLE_CREDENTIALS_JSON') && file_exists(getenv('GOOGLE_CREDENTIALS_JSON'))) {
+            try {
+                $this->notify = new NotificationService();
+            } catch (\Throwable $e) {
+                // If notification service fails to initialize, continue without it
+                $this->notify = null;
+            }
+        } else {
+            $this->notify = null;
+        }
+        
         $this->detector = new WeekendDetector();
         // Prefer admin-configured user agent if present
         $ua = null;
@@ -142,7 +154,7 @@ class ScraperService
                     }
                 }
 
-                if ($weekendFound) {
+                if ($weekendFound && $this->notify) {
                     // Send to users based on their preferences
                     $notifyResult = $this->notify->sendAvailabilityAlertsToMatchingUsers(
                         (int)$park['id'],

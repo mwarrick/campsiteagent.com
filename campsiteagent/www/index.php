@@ -10,6 +10,7 @@ use CampsiteAgent\Infrastructure\Database;
 use CampsiteAgent\Services\ScraperService;
 use CampsiteAgent\Repositories\ParkRepository;
 use CampsiteAgent\Repositories\SettingsRepository;
+use CampsiteAgent\Repositories\FacilityRepository;
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -52,6 +53,53 @@ $uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 if ($method === 'GET' && $uri === '/api/parks') {
     $repo = new ParkRepository();
     json(200, ['parks' => $repo->listAll()]);
+}
+
+// Admin: create park
+if ($method === 'POST' && $uri === '/api/admin/parks') {
+    $uid = requireAuth();
+    requireAdmin($uid);
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+    $name = trim((string)($input['name'] ?? ''));
+    $parkNumber = trim((string)($input['park_number'] ?? ''));
+    if ($name === '' || $parkNumber === '') {
+        json(400, ['error' => 'name and park_number are required']);
+    }
+    $parks = new ParkRepository();
+    try {
+        $id = $parks->createPark($name, $parkNumber, true);
+        json(201, ['message' => 'Park created', 'id' => $id]);
+    } catch (\Throwable $e) {
+        json(500, ['error' => 'Failed to create park', 'details' => $e->getMessage()]);
+    }
+}
+
+// Admin: delete park
+if ($method === 'DELETE' && preg_match('#^/api/admin/parks/(\d+)$#', $uri, $m)) {
+    $uid = requireAuth();
+    requireAdmin($uid);
+    $parkId = (int)$m[1];
+
+    // Optional safety: prevent delete if facilities or sites exist
+    $pdo = Database::getConnection();
+    $hasDeps = false;
+    $c1 = $pdo->prepare('SELECT COUNT(*) FROM facilities WHERE park_id = :id');
+    $c1->execute([':id' => $parkId]);
+    if ((int)$c1->fetchColumn() > 0) { $hasDeps = true; }
+    $c2 = $pdo->prepare('SELECT COUNT(*) FROM sites WHERE park_id = :id');
+    $c2->execute([':id' => $parkId]);
+    if ((int)$c2->fetchColumn() > 0) { $hasDeps = true; }
+    if ($hasDeps) {
+        json(409, ['error' => 'Park has dependent facilities or sites. Remove them first.']);
+    }
+
+    $parks = new ParkRepository();
+    try {
+        $parks->delete($parkId);
+        json(200, ['message' => 'Park deleted']);
+    } catch (\Throwable $e) {
+        json(500, ['error' => 'Failed to delete park', 'details' => $e->getMessage()]);
+    }
 }
 // Admin: settings get
 if ($method === 'GET' && $uri === '/api/admin/settings') {
@@ -185,7 +233,7 @@ if ($method === 'GET' && $uri === '/api/availability/latest') {
 
     // Don't LIMIT the raw query - we need all dates for each site to detect weekends
     $sql = 'SELECT p.id AS park_id, p.name AS park_name, p.park_number, s.site_number, s.site_name, s.site_type, 
-                   f.name AS facility_name, a.date
+                   f.name AS facility_name, a.date, a.created_at AS found_at
             FROM parks p
             JOIN sites s ON s.park_id = p.id
             LEFT JOIN facilities f ON s.facility_id = f.id
@@ -218,10 +266,17 @@ if ($method === 'GET' && $uri === '/api/availability/latest') {
                 'site_name' => $r['site_name'],
                 'site_type' => $r['site_type'],
                 'facility_name' => $r['facility_name'],
-                'dates' => []
+                'dates' => [],
+                'found_at' => $r['found_at']
             ];
         }
         $byPark[$park][$key]['dates'][] = $r['date'];
+        // Track earliest discovery time for this site
+        if (!empty($r['found_at'])) {
+            if (empty($byPark[$park][$key]['found_at']) || $r['found_at'] < $byPark[$park][$key]['found_at']) {
+                $byPark[$park][$key]['found_at'] = $r['found_at'];
+            }
+        }
     }
 
     if ($weekendOnly) {
@@ -411,12 +466,22 @@ if ($method === 'POST' && $uri === '/api/register') {
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         json(400, ['error' => 'Invalid email']);
     }
+    
+    // Check if user already exists and is verified
+    $users = new UserRepository();
+    $existingUser = $users->findByEmail($email);
+    $isExistingVerified = $existingUser && !empty($existingUser['verified_at']);
+    
     $auth = new AuthService();
     $ok = $auth->sendVerificationEmail($email, $first, $last);
     if ($ok) {
-        json(200, ['message' => 'Verification email sent']);
+        if ($isExistingVerified) {
+            json(200, ['message' => 'You already have an account! A login link has been sent to your email.']);
+        } else {
+            json(200, ['message' => 'Verification email sent']);
+        }
     }
-    json(500, ['error' => 'Failed to send verification email']);
+    json(500, ['error' => 'Failed to send email']);
 }
 
 if ($method === 'POST' && $uri === '/api/login') {
@@ -731,6 +796,79 @@ if ($method === 'POST' && $uri === '/api/admin/sync-facilities') {
         
     } catch (\Throwable $e) {
         json(500, ['error' => $e->getMessage()]);
+    }
+}
+
+// Admin: List all users
+if ($method === 'GET' && $uri === '/api/admin/users') {
+    $uid = requireAuth();
+    requireAdmin($uid);
+    
+    $repo = new UserRepository();
+    $users = $repo->getAllUsers();
+    json(200, ['users' => $users]);
+}
+
+// Admin: Update user status (active/inactive)
+if ($method === 'POST' && preg_match('#^/api/admin/users/(\d+)/status$#', $uri, $matches)) {
+    $uid = requireAuth();
+    requireAdmin($uid);
+    
+    $userId = (int)$matches[1];
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+    $active = isset($input['active']) ? (bool)$input['active'] : false;
+    
+    $repo = new UserRepository();
+    $success = $repo->updateUserStatus($userId, $active);
+    
+    if ($success) {
+        json(200, ['message' => 'User status updated']);
+    } else {
+        json(404, ['error' => 'User not found']);
+    }
+}
+
+// Admin: Update user role
+if ($method === 'POST' && preg_match('#^/api/admin/users/(\d+)/role$#', $uri, $matches)) {
+    $uid = requireAuth();
+    requireAdmin($uid);
+    
+    $userId = (int)$matches[1];
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+    $role = $input['role'] ?? '';
+    
+    if (!in_array($role, ['admin', 'user'], true)) {
+        json(400, ['error' => 'Invalid role']);
+    }
+    
+    $repo = new UserRepository();
+    $success = $repo->updateUserRole($userId, $role);
+    
+    if ($success) {
+        json(200, ['message' => 'User role updated']);
+    } else {
+        json(404, ['error' => 'User not found']);
+    }
+}
+
+// Admin: Update user names
+if ($method === 'POST' && preg_match('#^/api/admin/users/(\d+)/names$#', $uri, $matches)) {
+    header('Content-Type: application/json');
+    $uid = requireAuth();
+    requireAdmin($uid);
+    
+    $userId = (int)$matches[1];
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+    $firstName = trim($input['first_name'] ?? '');
+    $lastName = trim($input['last_name'] ?? '');
+    
+    $repo = new UserRepository();
+    $success = $repo->updateUserNames($userId, $firstName, $lastName);
+    
+    if ($success) {
+        json(200, ['message' => 'User names updated']);
+    } else {
+        json(404, ['error' => 'User not found']);
     }
 }
 

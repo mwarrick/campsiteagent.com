@@ -25,6 +25,7 @@ CampsiteAgent.com is a web application that automatically monitors ReserveCalifo
 - **⚙️ Admin Controls**: Park activation, facility management, metadata sync
 - **👥 User Preferences**: Customizable alert preferences per user
 - **🔧 Admin Scraping Interface**: Dedicated admin interface for data collection
+- **⏰ Daily Automated Scraping**: Automated daily scraping at 6 AM (⚠️ **Known Issues**: Still has bugs, use manual scraping for reliability)
 
 ### 🚀 Technical Features
 
@@ -256,6 +257,11 @@ php_value max_execution_time 300
 ```
 
 ## 🐛 Troubleshooting
+
+### Known Issues
+
+1. **Daily Automated Scraping**: The automated daily scraping feature has bugs and may not work reliably. Use manual scraping via the admin interface for consistent results.
+2. **SQL Parameter Errors**: Occasional "SQLSTATE[HY093]: Invalid parameter number" errors during scraping (does not affect functionality)
 
 ### Common Issues
 

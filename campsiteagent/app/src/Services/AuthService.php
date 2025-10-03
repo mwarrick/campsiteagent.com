@@ -23,10 +23,19 @@ class AuthService
     public function sendVerificationEmail(string $email, string $firstName = '', string $lastName = ''): bool
     {
         $user = $this->users->findByEmail($email);
+        
+        // If user already exists and is verified, send login link instead
+        if ($user && !empty($user['verified_at'])) {
+            return $this->sendLoginEmail($email);
+        }
+        
+        // If user doesn't exist, create new user
         if (!$user) {
             $userId = $this->users->create($firstName, $lastName, $email);
             $user = [ 'id' => $userId, 'first_name' => $firstName, 'last_name' => $lastName, 'email' => $email ];
         }
+        
+        // Send verification email for new or unverified users
         $token = $this->tokens->create((int)$user['id'], 'verify', 60);
         $verifyUrl = $this->appUrl . '/api/auth/verify?token=' . urlencode($token);
         return $this->notifications->sendVerification($user['email'], $verifyUrl, $user['first_name'] ?? '');
