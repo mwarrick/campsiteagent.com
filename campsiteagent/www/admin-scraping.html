@@ -246,6 +246,72 @@
         .admin-only p {
             color: #742a2a;
         }
+
+        /* Facilities Manager Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal {
+            background: #fff;
+            width: 90%;
+            max-width: 900px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.5rem;
+            background: #4c51bf;
+            color: #fff;
+        }
+        .modal-body {
+            padding: 1.25rem 1.5rem 1.5rem;
+        }
+        .modal-actions {
+            display: flex;
+            gap: .5rem;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .facilities-list {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            max-height: 400px;
+            overflow: auto;
+        }
+        .facility-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: .75rem 1rem;
+            border-bottom: 1px solid #edf2f7;
+        }
+        .facility-row:last-child { border-bottom: 0; }
+        .badge {
+            display: inline-block;
+            padding: .15rem .5rem;
+            border-radius: 999px;
+            font-size: .75rem;
+            font-weight: 600;
+        }
+        .badge-active { background: #c6f6d5; color: #22543d; }
+        .badge-inactive { background: #fed7d7; color: #742a2a; }
+        .btn-link {
+            background: transparent;
+            color: #4c51bf;
+            padding: .25rem .5rem;
+            border-radius: 6px;
+        }
+        .btn-link:hover { background: #edf2f7; }
     </style>
 </head>
 <body>
@@ -346,6 +412,25 @@
                         <div class="stat-label">Elapsed Time</div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Facilities Manager Modal -->
+    <div id="facilitiesModal" class="modal-overlay" aria-hidden="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="facilitiesTitle">
+            <div class="modal-header">
+                <h3 id="facilitiesTitle">⚙️ Manage Facilities</h3>
+                <button id="closeFacilities" class="btn-link" aria-label="Close">✖</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-actions">
+                    <label for="facilitiesParkSelect" style="font-weight:600; color:#4a5568;">Park:</label>
+                    <select id="facilitiesParkSelect" style="padding:.5rem; border:2px solid #e2e8f0; border-radius:8px;"></select>
+                    <button id="activateAllFacilities" class="btn-success" style="padding:.5rem 1rem;">Activate All</button>
+                    <button id="deactivateAllFacilities" class="btn-danger" style="padding:.5rem 1rem;">Deactivate All</button>
+                </div>
+                <div id="facilitiesContainer" class="facilities-list"></div>
             </div>
         </div>
     </div>
@@ -567,9 +652,127 @@
             }
         }
 
+        // Facilities Manager
+        function openFacilitiesModal() {
+            const overlay = document.getElementById('facilitiesModal');
+            overlay.style.display = 'flex';
+
+            // Populate parks dropdown using already loaded allParks
+            const sel = document.getElementById('facilitiesParkSelect');
+            sel.innerHTML = '';
+            const selectedInMain = Array.from(document.getElementById('parkSelect').selectedOptions).map(o => o.value);
+            allParks.filter(p => p.active).forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = `${p.name} (${p.park_number || p.external_id})`;
+                if (selectedInMain.length === 1 && String(p.id) === String(selectedInMain[0])) {
+                    opt.selected = true;
+                }
+                sel.appendChild(opt);
+            });
+
+            // Load facilities for initial selection
+            const initialParkId = sel.value || (sel.options[0] && sel.options[0].value);
+            if (initialParkId) {
+                loadFacilitiesForPark(parseInt(initialParkId, 10));
+            } else {
+                document.getElementById('facilitiesContainer').innerHTML = '<div style="padding:1rem; color:#718096;">No active parks available.</div>';
+            }
+        }
+
+        function closeFacilitiesModal() {
+            const overlay = document.getElementById('facilitiesModal');
+            overlay.style.display = 'none';
+        }
+
+        async function loadFacilitiesForPark(parkId) {
+            const container = document.getElementById('facilitiesContainer');
+            container.innerHTML = '<div style="padding:1rem; color:#718096;">Loading facilities...</div>';
+            try {
+                const res = await fetch(`/api/admin/parks/${parkId}/facilities`, { credentials: 'same-origin' });
+                if (!res.ok) throw new Error('Failed to load facilities');
+                const data = await res.json();
+                const facilities = data.facilities || [];
+                if (facilities.length === 0) {
+                    container.innerHTML = '<div style="padding:1rem; color:#718096;">No facilities found for this park.</div>';
+                    return;
+                }
+                container.innerHTML = '';
+                facilities.forEach(f => {
+                    const row = document.createElement('div');
+                    row.className = 'facility-row';
+                    const left = document.createElement('div');
+                    left.style.display = 'flex';
+                    left.style.flexDirection = 'column';
+                    const name = document.createElement('div');
+                    name.textContent = `${f.name} [${f.facility_id}]`;
+                    const meta = document.createElement('div');
+                    meta.style.color = '#718096';
+                    meta.style.fontSize = '.85rem';
+                    meta.textContent = `DB ID: ${f.id}`;
+                    left.appendChild(name);
+                    left.appendChild(meta);
+                    const right = document.createElement('div');
+                    right.style.display = 'flex';
+                    right.style.alignItems = 'center';
+                    right.style.gap = '.5rem';
+                    const badge = document.createElement('span');
+                    const active = !!f.active;
+                    badge.className = 'badge ' + (active ? 'badge-active' : 'badge-inactive');
+                    badge.textContent = active ? 'Active' : 'Inactive';
+                    const toggleBtn = document.createElement('button');
+                    toggleBtn.className = 'btn-link';
+                    toggleBtn.textContent = active ? 'Deactivate' : 'Activate';
+                    toggleBtn.addEventListener('click', async () => {
+                        await toggleFacilityActivation(f.id, !active);
+                        loadFacilitiesForPark(parkId);
+                    });
+                    right.appendChild(badge);
+                    right.appendChild(toggleBtn);
+                    row.appendChild(left);
+                    row.appendChild(right);
+                    container.appendChild(row);
+                });
+            } catch (e) {
+                container.innerHTML = '<div style="padding:1rem; color:#e53e3e;">Error loading facilities.</div>';
+            }
+        }
+
+        async function toggleFacilityActivation(facilityDbId, active) {
+            try {
+                const res = await fetch(`/api/admin/facilities/${facilityDbId}/toggle`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ active: active ? 1 : 0 })
+                });
+                if (!res.ok) throw new Error('Failed to toggle facility');
+                return true;
+            } catch (e) {
+                alert('❌ Error: ' + e.message);
+                return false;
+            }
+        }
+
+        async function bulkToggleFacilities(parkId, active) {
+            try {
+                const res = await fetch('/api/admin/facilities/bulk-toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ parkId, active: active ? 1 : 0 })
+                });
+                if (!res.ok) throw new Error('Failed to bulk toggle');
+                return true;
+            } catch (e) {
+                alert('❌ Error: ' + e.message);
+                return false;
+            }
+        }
+
         // Manage facilities
         function manageFacilities() {
-            window.open('/dashboard.html#facilities', '_blank');
+            openFacilitiesModal();
         }
 
         // Select all parks
@@ -587,6 +790,26 @@
         document.getElementById('stopScraping').addEventListener('click', stopScraping);
         document.getElementById('syncFacilities').addEventListener('click', syncFacilities);
         document.getElementById('manageFacilities').addEventListener('click', manageFacilities);
+        document.getElementById('closeFacilities').addEventListener('click', closeFacilitiesModal);
+        document.getElementById('facilitiesModal').addEventListener('click', (e) => { if (e.target.id === 'facilitiesModal') closeFacilitiesModal(); });
+        document.getElementById('facilitiesParkSelect').addEventListener('change', (e) => {
+            const parkId = parseInt(e.target.value, 10);
+            if (parkId) loadFacilitiesForPark(parkId);
+        });
+        document.getElementById('activateAllFacilities').addEventListener('click', async () => {
+            const sel = document.getElementById('facilitiesParkSelect');
+            const parkId = parseInt(sel.value || '0', 10);
+            if (!parkId) return;
+            const ok = await bulkToggleFacilities(parkId, true);
+            if (ok) loadFacilitiesForPark(parkId);
+        });
+        document.getElementById('deactivateAllFacilities').addEventListener('click', async () => {
+            const sel = document.getElementById('facilitiesParkSelect');
+            const parkId = parseInt(sel.value || '0', 10);
+            if (!parkId) return;
+            const ok = await bulkToggleFacilities(parkId, false);
+            if (ok) loadFacilitiesForPark(parkId);
+        });
         document.getElementById('logoutBtn').addEventListener('click', async () => {
             try {
                 await fetch('/api/logout', { method: 'POST' });
