@@ -651,7 +651,11 @@
                     const response = await res.json();
                     const user = response.user;
                     
-                    if (user.role === 'admin') {
+                    // Debug: log the response to console
+                    console.log('API Response:', response);
+                    console.log('User role:', user ? user.role : 'undefined');
+                    
+                    if (user && user.role === 'admin') {
                         document.getElementById('userInfo').textContent = `Welcome, ${user.email}`;
                         document.getElementById('userInfo').style.display = 'inline';
                         document.getElementById('logoutBtn').style.display = 'inline';
@@ -662,6 +666,7 @@
                         document.getElementById('adminCheck').innerHTML = `
                             <h2>❌ Access Denied</h2>
                             <p>You must be an admin to access this page.</p>
+                            <p><small>Debug: Role = "${user ? user.role : 'undefined'}"</small></p>
                         `;
                     }
                 } else {
