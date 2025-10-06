@@ -105,10 +105,21 @@ class SiteRepository
 
     public function upsertAvailability(int $siteId, string $date, bool $isAvailable): void
     {
-        $sql = 'INSERT INTO site_availability (site_id, date, is_available) VALUES (:site_id, :date, :avail)
-                ON DUPLICATE KEY UPDATE 
-                    is_available = VALUES(is_available),
-                    updated_at = CURRENT_TIMESTAMP';
+        // Check if updated_at column exists
+        $stmt = $this->pdo->query("SHOW COLUMNS FROM site_availability LIKE 'updated_at'");
+        $hasUpdatedAt = $stmt->rowCount() > 0;
+        
+        if ($hasUpdatedAt) {
+            $sql = 'INSERT INTO site_availability (site_id, date, is_available) VALUES (:site_id, :date, :avail)
+                    ON DUPLICATE KEY UPDATE 
+                        is_available = VALUES(is_available),
+                        updated_at = CURRENT_TIMESTAMP';
+        } else {
+            $sql = 'INSERT INTO site_availability (site_id, date, is_available) VALUES (:site_id, :date, :avail)
+                    ON DUPLICATE KEY UPDATE 
+                        is_available = VALUES(is_available)';
+        }
+        
         $stmt = $this->pdo->prepare($sql);
         
         try {
