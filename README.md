@@ -34,7 +34,8 @@ CampsiteAgent.com is a web application that automatically monitors ReserveCalifo
 - **⚙️ Admin Controls**: Park activation, facility management, metadata sync
 - **👥 User Preferences**: Customizable alert preferences per user
 - **🔧 Admin Scraping Interface**: Dedicated admin interface for data collection
-- **⏰ Daily Automated Scraping**: Automated daily scraping at 6 AM (⚠️ **Known Issues**: Still has bugs, use manual scraping for reliability)
+- **⏰ Daily Automated Scraping**: Automated daily scraping with CLI script and cron job support
+- **📱 Mobile Responsive**: Optimized for mobile devices (390px+ width)
 
 ### 🚀 Technical Features
 
@@ -210,14 +211,14 @@ Access the application at `http://127.0.0.1:8080`
 - `GET /api/availability/export.csv` - Export availability as CSV
 - `POST /api/check-now` - Trigger manual availability check (admin)
 
-### Admin Endpoints
 ### Favorites & Metadata Endpoints
 
-- `GET /api/favorites` — List current user’s favorite site IDs
+- `GET /api/favorites` — List current user's favorite site IDs
 - `POST /api/favorites/{siteId}/toggle` — Toggle favorite for a site
 - `GET /api/parks/{parkId}/facilities` — List active facilities for a park
 - `GET /api/facilities/{facilityId}/sites` — List all sites for a facility with `favorite` flag
 
+### Admin Endpoints
 
 - `GET /api/admin/parks` - List all parks
 - `POST /api/admin/parks` - Create/update park
@@ -225,6 +226,9 @@ Access the application at `http://127.0.0.1:8080`
 - `POST /api/admin/facilities/{id}/toggle` - Toggle facility status
 - `POST /api/admin/sync-facilities` - Sync facilities from API
 - `POST /api/admin/sync-metadata` - Sync park metadata
+- `POST /api/admin/notifications/daily-test` - Send test digest email (admin only)
+- `POST /api/admin/notifications/daily-run` - Send daily digest to all users
+- `POST /api/admin/notifications/scrape-results` - Send email with scrape results
 
 ## 🎯 Usage
 
@@ -234,7 +238,13 @@ Access the application at `http://127.0.0.1:8080`
 2. **Login**: Check your email for the login link
 3. **Browse**: Use the dashboard to view available campsites
 4. **Filter**: Use date range and park filters to find specific availability
-5. **Export**: Download CSV files for offline analysis
+5. **Favorites**: 
+   - Click "★ Manage Favorites" to mark favorite sites
+   - Select Park → Facility → Sites to manage favorites
+   - Use "Favorites only" filter to see only your favorite sites
+   - Favorite sites appear with colored stars and are prioritized in results
+6. **Preferences**: Set up email alert preferences for specific parks and date ranges
+7. **Export**: Download CSV files for offline analysis
 
 ### For Administrators
 
@@ -242,7 +252,27 @@ Access the application at `http://127.0.0.1:8080`
 2. **Manage Parks**: Activate/deactivate parks for monitoring
 3. **Sync Facilities**: Update facility data from ReserveCalifornia
 4. **Monitor Scraping**: Use the admin scraping interface for data collection
-5. **Manage Users**: View user preferences and activity
+5. **Email Testing**: Use "Send Test Digest" to test email notifications
+6. **Daily Notifications**: Set up cron job for automated daily email digests
+7. **Manage Users**: View user preferences and activity
+
+### Command Line Interface
+
+The system includes a CLI script for automated operations:
+
+```bash
+# Full scraping with email notifications
+/usr/bin/php /var/www/campsite-agent/app/bin/check-now.php
+
+# Email-only mode (no scraping, uses existing data)
+/usr/bin/php /var/www/campsite-agent/app/bin/check-now.php --dry-run
+```
+
+**Cron Job Setup** (for daily automated emails):
+```bash
+# Add to crontab (runs daily at 6 AM)
+0 6 * * * /usr/bin/php /var/www/campsite-agent/app/bin/check-now.php --dry-run
+```
 
 ## 🔧 Configuration
 
@@ -279,8 +309,8 @@ php_value max_execution_time 300
 
 ### Known Issues
 
-1. **Daily Automated Scraping**: The automated daily scraping feature has bugs and may not work reliably. Use manual scraping via the admin interface for consistent results.
-2. **SQL Parameter Errors**: Occasional "SQLSTATE[HY093]: Invalid parameter number" errors during scraping (does not affect functionality)
+1. **SQL Parameter Errors**: Occasional "SQLSTATE[HY093]: Invalid parameter number" errors during scraping (does not affect functionality)
+2. **Email Delivery**: Gmail API rate limits may affect high-volume email sending
 
 ### Common Issues
 
@@ -310,6 +340,7 @@ php_value error_log /var/log/php_errors.log
 
 - **Apache Error Log**: `/var/log/apache2/error.log`
 - **PHP Error Log**: `/var/log/php_errors.log`
+- **Scraping Log**: `/var/www/campsite-agent/logs/scrape.log`
 - **Application Logs**: Check database `availability_runs` table for scraping history
 
 ## 🤝 Contributing
