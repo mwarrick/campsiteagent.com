@@ -744,6 +744,32 @@
                     // Handle different message types
                     if (data.type === 'completed') {
                         addLogEntry('info', '✅ Scraping completed successfully');
+                        
+                        // Send email with results if any weekend availability was found
+                        if (stats.sitesFound > 0) {
+                            try {
+                                const emailRes = await fetchWithAuth('/api/admin/notifications/scrape-results', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        selectedParks: selectedParks,
+                                        dateRange: dateRange,
+                                        weekendOnly: weekendOnly,
+                                        scrapingMode: scrapingMode,
+                                        stats: stats
+                                    })
+                                });
+                                const emailData = await emailRes.json();
+                                if (emailRes.ok && emailData.sent) {
+                                    addLogEntry('info', `📧 Results email sent to ${emailData.to} (${emailData.sites} sites found)`);
+                                } else {
+                                    addLogEntry('warning', '📧 Failed to send results email: ' + (emailData.error || 'unknown error'));
+                                }
+                            } catch (e) {
+                                addLogEntry('warning', '📧 Error sending results email: ' + e.message);
+                            }
+                        }
+                        
                         stopScraping();
                         return;
                     }
@@ -991,7 +1017,13 @@
         document.getElementById('syncFacilities').addEventListener('click', syncFacilities);
         document.getElementById('manageFacilities').addEventListener('click', manageFacilities);
         document.getElementById('manageParks').addEventListener('click', () => openParksModal());
-        document.getElementById('sendDailyDigest').addEventListener('click', async () => {
+        document.getElementById('sendDailyDigest').addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            if (btn.disabled) return;
+            // Immediately disable and blank out to prevent double-clicks
+            btn.disabled = true;
+            const prevText = btn.textContent;
+            btn.textContent = '';
             try {
                 const res = await fetchWithAuth('/api/admin/notifications/daily-test', { method: 'POST' });
                 const data = await res.json();
@@ -1005,6 +1037,9 @@
             } catch (e) {
                 alert('❌ Error: ' + e.message);
             }
+            // Keep disabled and blank to avoid repeat sends
+            // If you ever want to re-enable after some time, restore:
+            // setTimeout(() => { btn.disabled = false; btn.textContent = prevText; }, 30000);
         });
         document.getElementById('closeFacilities').addEventListener('click', closeFacilitiesModal);
         document.getElementById('facilitiesModal').addEventListener('click', (e) => { if (e.target.id === 'facilitiesModal') closeFacilitiesModal(); });
