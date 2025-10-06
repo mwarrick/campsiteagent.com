@@ -69,7 +69,7 @@
         margin-top: 30px;
       }
       
-      .btn {
+      .btn:not(#dashboardBtn) {
         display: block !important;
         width: calc(100% - 48px) !important;
         margin: 8px auto !important;
@@ -77,6 +77,10 @@
         font-size: 1rem;
         text-align: center;
         box-sizing: border-box;
+      }
+      
+      #dashboardBtn {
+        display: none !important;
       }
       
       .btn-secondary {
@@ -179,13 +183,17 @@
         margin-top: 24px;
       }
       
-      .btn {
+      .btn:not(#dashboardBtn) {
         width: calc(100% - 40px) !important;
         padding: 12px 20px;
         font-size: 0.95rem;
         margin: 6px auto !important;
         box-sizing: border-box;
         display: block !important;
+      }
+      
+      #dashboardBtn {
+        display: none !important;
       }
       
       .btn-secondary {
@@ -396,24 +404,25 @@
           const response = await res.json();
           if (response.authenticated) {
             // User is logged in - show dashboard button and hide auth buttons
-            document.getElementById('dashboardBtn').style.display = 'inline-block';
+            document.getElementById('dashboardBtn').style.display = 'block';
+            document.getElementById('dashboardBtn').style.setProperty('display', 'block', 'important');
             document.querySelector('.cta a[onclick="showRegister()"]').style.display = 'none';
             document.querySelector('.cta a[onclick="showLogin()"]').style.display = 'none';
           } else {
             // User not authenticated - hide dashboard button and show auth buttons
-            document.getElementById('dashboardBtn').style.display = 'none';
+            document.getElementById('dashboardBtn').style.setProperty('display', 'none', 'important');
             document.querySelector('.cta a[onclick="showRegister()"]').style.display = 'inline-block';
             document.querySelector('.cta a[onclick="showLogin()"]').style.display = 'inline-block';
           }
         } else {
           // API call failed - hide dashboard button and show auth buttons
-          document.getElementById('dashboardBtn').style.display = 'none';
+          document.getElementById('dashboardBtn').style.setProperty('display', 'none', 'important');
           document.querySelector('.cta a[onclick="showRegister()"]').style.display = 'inline-block';
           document.querySelector('.cta a[onclick="showLogin()"]').style.display = 'inline-block';
         }
       } catch (e) {
         // User not logged in, show normal landing page
-        document.getElementById('dashboardBtn').style.display = 'none';
+        document.getElementById('dashboardBtn').style.setProperty('display', 'none', 'important');
         document.querySelector('.cta a[onclick="showRegister()"]').style.display = 'inline-block';
         document.querySelector('.cta a[onclick="showLogin()"]').style.display = 'inline-block';
       }
