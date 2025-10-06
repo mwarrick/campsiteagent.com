@@ -282,14 +282,6 @@
               <option value="">All Parks</option>
             </select>
           </label>
-          <label>
-            Frequency
-            <select id="prefFrequency">
-              <option value="immediate">Immediate</option>
-              <option value="daily_digest">Daily Digest</option>
-              <option value="weekly_digest">Weekly Digest</option>
-            </select>
-          </label>
         </div>
         <div class="form-row">
           <label>
@@ -987,7 +979,6 @@
               <tr>
                 <th>Park</th>
                 <th>Dates</th>
-                <th>Frequency</th>
                 <th>Weekend Only</th>
                 <th>Enabled</th>
                 <th>Actions</th>
@@ -998,7 +989,7 @@
                 <tr>
                   <td>${p.park_name || '<em>All Parks</em>'}</td>
                   <td>${p.start_date || p.end_date ? `${p.start_date || '...'} to ${p.end_date || '...'}` : '<em>Any date</em>'}</td>
-                  <td>${p.frequency.replace('_', ' ')}</td>
+                  
                   <td>${p.weekend_only ? '✓ Yes' : '✗ No'}</td>
                   <td>
                     <label class="toggle-switch">
@@ -1025,7 +1016,6 @@
       const parkId = document.getElementById('prefPark').value || null;
       const startDate = document.getElementById('prefStartDate').value || null;
       const endDate = document.getElementById('prefEndDate').value || null;
-      const frequency = document.getElementById('prefFrequency').value;
       const weekendOnly = document.getElementById('prefWeekendOnly').checked;
 
       try {
@@ -1036,7 +1026,6 @@
             park_id: parkId,
             start_date: startDate,
             end_date: endDate,
-            frequency: frequency,
             weekend_only: weekendOnly,
             enabled: true
           })
@@ -1047,7 +1036,6 @@
           document.getElementById('prefPark').value = '';
           document.getElementById('prefStartDate').value = '';
           document.getElementById('prefEndDate').value = '';
-          document.getElementById('prefFrequency').value = 'immediate';
           document.getElementById('prefWeekendOnly').checked = true;
           
           // Reload preferences

@@ -878,10 +878,7 @@ if ($method === 'POST' && $uri === '/api/preferences') {
     $weekendOnly = isset($input['weekend_only']) ? (bool)$input['weekend_only'] : true;
     $enabled = isset($input['enabled']) ? (bool)$input['enabled'] : true;
     
-    // Validate frequency
-    if (!in_array($frequency, ['immediate', 'daily_digest', 'weekly_digest'], true)) {
-        json(400, ['error' => 'Invalid frequency']);
-    }
+    // Frequency removed; always use immediate behavior (ignored)
     
     $repo = new UserPreferencesRepository();
     $id = $repo->create($userId, $parkId, $startDate, $endDate, $frequency, $weekendOnly, $enabled);
@@ -914,7 +911,7 @@ if ($method === 'PUT' && preg_match('#^/api/preferences/(\d+)$#', $uri, $matches
         json(400, ['error' => 'Invalid frequency']);
     }
     
-    $repo->update($prefId, $parkId, $startDate, $endDate, $frequency, $weekendOnly, $enabled);
+    $repo->update($prefId, $parkId, $startDate, $endDate, 'immediate', $weekendOnly, $enabled);
     json(200, ['message' => 'Preference updated']);
 }
 
