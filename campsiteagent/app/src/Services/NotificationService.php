@@ -35,11 +35,11 @@ class NotificationService
         return $this->sendAndLog($toEmail, $subject, $html, $text);
     }
 
-    public function sendAvailabilityAlert(string $toEmail, string $parkName, string $dateRange, array $sites): bool
+    public function sendAvailabilityAlert(string $toEmail, string $parkName, string $dateRange, array $sites, array $favoriteSiteIds = []): bool
     {
         $subject = EmailTemplates::alertSubject($parkName, $dateRange);
-        $html = EmailTemplates::alertHtml($parkName, $dateRange, $sites);
-        $text = EmailTemplates::alertText($parkName, $dateRange, $sites);
+        $html = EmailTemplates::alertHtml($parkName, $dateRange, $sites, $favoriteSiteIds);
+        $text = EmailTemplates::alertText($parkName, $dateRange, $sites, $favoriteSiteIds);
         return $this->sendAndLog($toEmail, $subject, $html, $text);
     }
 

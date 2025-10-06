@@ -512,6 +512,103 @@ if ($method === 'GET' && $uri === '/api/check-now') {
     exit;
 }
 
+// Admin: send test daily digest email (no cron, for manual testing)
+if ($method === 'POST' && $uri === '/api/admin/notifications/daily-test') {
+    header('Content-Type: application/json');
+    $uid = requireAuth();
+    requireAdmin($uid);
+
+    try {
+        $pdo = Database::getConnection();
+
+        // Pull all upcoming availability with facility and park info
+        $sql = 'SELECT p.id AS park_id, p.name AS park_name, p.park_number,
+                       s.site_number, s.site_name, s.site_type,
+                       f.name AS facility_name, a.date
+                FROM parks p
+                JOIN sites s ON s.park_id = p.id
+                LEFT JOIN facilities f ON s.facility_id = f.id
+                JOIN site_availability a ON a.site_id = s.id
+                WHERE a.is_available = 1 AND a.date >= CURDATE()
+                ORDER BY p.name, a.date ASC, s.site_number ASC';
+        $rows = $pdo->query($sql)->fetchAll();
+
+        // Group by park and site, collect dates
+        $byPark = [];
+        foreach ($rows as $r) {
+            $park = $r['park_name'];
+            $key = $r['site_number'] . '|' . ($r['site_name'] ?? '') . '|' . ($r['site_type'] ?? '');
+            if (!isset($byPark[$park])) { $byPark[$park] = []; }
+            if (!isset($byPark[$park][$key])) {
+                $byPark[$park][$key] = [
+                    'site_number' => $r['site_number'],
+                    'site_name' => $r['site_name'],
+                    'site_type' => $r['site_type'],
+                    'facility_name' => $r['facility_name'],
+                    'dates' => []
+                ];
+            }
+            $byPark[$park][$key]['dates'][] = $r['date'];
+        }
+
+        // Detect weekends and build a flat list of alert sites
+        $alertSites = [];
+        $allFridays = [];
+        foreach ($byPark as $park => $sites) {
+            foreach ($sites as $s) {
+                $dateSet = array_fill_keys($s['dates'], true);
+                $weekendDates = [];
+                foreach ($s['dates'] as $d) {
+                    $ts = strtotime($d);
+                    if ((int)date('w', $ts) === 5) { // Friday
+                        $fri = date('Y-m-d', $ts);
+                        $sat = date('Y-m-d', $ts + 86400);
+                        if (isset($dateSet[$sat])) {
+                            $weekendDates[] = ['fri' => $fri, 'sat' => $sat];
+                            $allFridays[] = $fri;
+                        }
+                    }
+                }
+                if (!empty($weekendDates)) {
+                    $alertSites[] = [
+                        'site_id' => $s['site_id'] ?? null,
+                        'site_number' => $s['site_number'],
+                        'site_name' => $s['site_name'] ?? '',
+                        'site_type' => $s['site_type'] ?? '',
+                        'facility_name' => $s['facility_name'] ?? '',
+                        'park_name' => $park,
+                        'weekend_dates' => $weekendDates
+                    ];
+                }
+            }
+        }
+
+        if (empty($alertSites)) {
+            json(200, ['sent' => false, 'message' => 'No weekend availability to include in digest']);
+        }
+
+        $earliest = !empty($allFridays) ? min($allFridays) : date('Y-m-d');
+        $latest = !empty($allFridays) ? max($allFridays) : date('Y-m-d');
+        $dateRangeStr = date('n/j', strtotime($earliest)) . '-' . date('n/j/Y', strtotime($latest));
+
+        $to = getenv('ALERT_TEST_EMAIL');
+        if (!$to) {
+            json(400, ['error' => 'ALERT_TEST_EMAIL not configured in environment']);
+        }
+
+        // Include admin user's favorites to highlight in digest
+        $favRepo = new \CampsiteAgent\Repositories\UserFavoritesRepository();
+        $favoriteSiteIds = $favRepo->listFavoriteSiteIds($uid);
+
+        $notify = new \CampsiteAgent\Services\NotificationService();
+        $ok = $notify->sendAvailabilityAlert($to, 'Daily Digest', $dateRangeStr, $alertSites, $favoriteSiteIds);
+
+        json(200, ['sent' => $ok, 'to' => $to, 'sites' => count($alertSites), 'dateRange' => $dateRangeStr]);
+    } catch (\Throwable $e) {
+        json(500, ['error' => $e->getMessage()]);
+    }
+}
+
 
 if ($method === 'POST' && $uri === '/api/register') {
     header('Content-Type: application/json');

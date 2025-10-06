@@ -45,7 +45,7 @@ class EmailTemplates
         return "Weekend availability found for {$dateRange}: {$parkName}";
     }
 
-    public static function alertHtml(string $parkName, string $dateRange, array $sites): string
+    public static function alertHtml(string $parkName, string $dateRange, array $sites, array $favoriteSiteIds = []): string
     {
         $park = htmlspecialchars($parkName);
         $range = htmlspecialchars($dateRange);
@@ -76,51 +76,71 @@ class EmailTemplates
             $friFormatted = date('D, M j', strtotime($weekend['fri']));
             $satFormatted = date('D, M j, Y', strtotime($weekend['sat']));
             
-            // Group sites by facility
-            $byFacility = [];
+            // Group sites by park then facility
+            $byPark = [];
             foreach ($weekend['sites'] as $site) {
-                $facility = $site['facility_name'] ?? 'Unknown Facility';
-                if (!isset($byFacility[$facility])) {
-                    $byFacility[$facility] = [];
-                }
-                $byFacility[$facility][] = $site;
+                $pName = $site['park_name'] ?? $parkName;
+                $fName = $site['facility_name'] ?? 'Unknown Facility';
+                if (!isset($byPark[$pName])) { $byPark[$pName] = []; }
+                if (!isset($byPark[$pName][$fName])) { $byPark[$pName][$fName] = []; }
+                $byPark[$pName][$fName][] = $site;
             }
+            ksort($byPark, SORT_NATURAL | SORT_FLAG_CASE);
             
-            // Build facility sections with View links
-            $facilitySections = '';
-            $parkUrl = "https://reservecalifornia.com/Web/Default.aspx#!park/712";
-            
-            foreach ($byFacility as $facilityName => $facilitySites) {
-                // Sort sites alphabetically by site_number within each facility
-                usort($facilitySites, function($a, $b) {
-                    $an = (string)($a['site_number'] ?? '');
-                    $bn = (string)($b['site_number'] ?? '');
-                    return strnatcasecmp($an, $bn);
-                });
-                $siteNumbers = array_map(function($s) {
-                    return htmlspecialchars((string)($s['site_number'] ?? ''));
-                }, $facilitySites);
-                
-                $facilitySections .= "<div style='margin-left: 16px; margin-bottom: 8px;'>";
-                $facilitySections .= "<div style='font-weight: 500; color: #059669; font-size: 14px;'>";
-                $facilitySections .= htmlspecialchars($facilityName) . " (" . count($facilitySites) . " sites) ";
-                $facilitySections .= "<a href='{$parkUrl}' style='margin-left: 8px; font-size: 12px; color: #2563eb; text-decoration: none;'>→ View</a>";
-                $facilitySections .= "</div>";
-                $facilitySections .= "<div style='font-size: 13px; color: #6b7280; margin-left: 8px;'>" . implode(', ', $siteNumbers) . "</div>";
-                $facilitySections .= "</div>";
+            // Build sections Park → Facility → Sites
+            $parkSections = '';
+            foreach ($byPark as $pName => $facilities) {
+                $parkSections .= "<div style='margin-left: 8px; margin-bottom: 6px; font-weight:600; color:#1f2937;'>" . htmlspecialchars($pName) . "</div>";
+                ksort($facilities, SORT_NATURAL | SORT_FLAG_CASE);
+                foreach ($facilities as $facilityName => $facilitySites) {
+                    // Sort and dedupe site numbers
+                    usort($facilitySites, function($a, $b) {
+                        $an = (string)($a['site_number'] ?? '');
+                        $bn = (string)($b['site_number'] ?? '');
+                        return strnatcasecmp($an, $bn);
+                    });
+                    $numbers = [];
+                    foreach ($facilitySites as $s) {
+                        $num = (string)($s['site_number'] ?? '');
+                        if ($num === '') continue;
+                        if (in_array($num, $numbers, true)) continue;
+                        $numbers[] = $num;
+                    }
+                    // Mark favorites
+                    $rendered = array_map(function($sNum) use ($facilitySites, $favoriteSiteIds) {
+                        // Determine if any site in this facility with this number is a favorite by site_id
+                        $isFav = false;
+                        foreach ($facilitySites as $s) {
+                            if ((string)($s['site_number'] ?? '') === $sNum) {
+                                if (!empty($s['site_id']) && in_array((int)$s['site_id'], $favoriteSiteIds, true)) { $isFav = true; break; }
+                            }
+                        }
+                        $safeNum = htmlspecialchars($sNum);
+                        return $isFav ? "<span style='color:#d97706; font-weight:600;'>★ {$safeNum}</span>" : $safeNum;
+                    }, $numbers);
+
+                    $parkUrl = "https://reservecalifornia.com/Web/Default.aspx#!";
+                    $parkSections .= "<div style='margin-left: 16px; margin-bottom: 8px;'>";
+                    $parkSections .= "<div style='font-weight: 500; color: #059669; font-size: 14px;'>";
+                    $parkSections .= htmlspecialchars($facilityName) . " (" . count($numbers) . " sites) ";
+                    $parkSections .= "<a href='{$parkUrl}' style='margin-left: 8px; font-size: 12px; color: #2563eb; text-decoration: none;'>→ View</a>";
+                    $parkSections .= "</div>";
+                    $parkSections .= "<div style='font-size: 13px; color: #6b7280; margin-left: 8px;'>" . implode(', ', $rendered) . "</div>";
+                    $parkSections .= "</div>";
+                }
             }
             
             $sections .= "<div style='margin-bottom: 20px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb;'>";
             $sections .= "<h3 style='color: #2563eb; margin: 0 0 8px 0;'>📅 {$friFormatted} - {$satFormatted}</h3>";
             $sections .= "<p style='margin: 0 0 8px 0; font-size: 14px; color: #4b5563;'><strong>" . count($weekend['sites']) . " sites available</strong></p>";
-            $sections .= $facilitySections;
+            $sections .= $parkSections;
             $sections .= "</div>";
         }
         
         return "<p><strong>Weekend availability found!</strong></p><p>Park: <strong>{$park}</strong></p><div style='background: #eef2ff; border-left: 4px solid #4c51bf; padding: 12px; margin: 12px 0;'><strong>ℹ️ Note:</strong> Click 'View' links to go to the ReserveCalifornia booking page. You'll need to manually select the dates shown below, as direct booking links are not supported.</div><hr>{$sections}";
     }
 
-    public static function alertText(string $parkName, string $dateRange, array $sites): string
+    public static function alertText(string $parkName, string $dateRange, array $sites, array $favoriteSiteIds = []): string
     {
         $lines = [
             "Weekend availability found!",
@@ -159,32 +179,47 @@ class EmailTemplates
             $lines[] = "📅 {$friFormatted} - {$satFormatted}";
             $lines[] = "   " . count($weekend['sites']) . " sites available";
             
-            // Group by facility
-            $byFacility = [];
+            // Group by park then facility
+            $byPark = [];
             foreach ($weekend['sites'] as $site) {
-                $facility = $site['facility_name'] ?? 'Unknown Facility';
-                if (!isset($byFacility[$facility])) {
-                    $byFacility[$facility] = [];
-                }
-                $byFacility[$facility][] = $site;
+                $pName = $site['park_name'] ?? $parkName;
+                $fName = $site['facility_name'] ?? 'Unknown Facility';
+                if (!isset($byPark[$pName])) { $byPark[$pName] = []; }
+                if (!isset($byPark[$pName][$fName])) { $byPark[$pName][$fName] = []; }
+                $byPark[$pName][$fName][] = $site;
             }
-            
-            $parkUrl = "https://reservecalifornia.com/Web/Default.aspx#!park/712";
-            
-            foreach ($byFacility as $facilityName => $facilitySites) {
-                // Sort sites alphabetically by site_number within each facility
-                usort($facilitySites, function($a, $b) {
-                    $an = (string)($a['site_number'] ?? '');
-                    $bn = (string)($b['site_number'] ?? '');
-                    return strnatcasecmp($an, $bn);
-                });
-                $siteNumbers = array_map(function($s) {
-                    return $s['site_number'] ?? '';
-                }, $facilitySites);
-                
-                $lines[] = "   {$facilityName} (" . count($facilitySites) . " sites)";
-                $lines[] = "   View: {$parkUrl}";
-                $lines[] = "   Sites: " . implode(', ', $siteNumbers);
+            ksort($byPark, SORT_NATURAL | SORT_FLAG_CASE);
+
+            foreach ($byPark as $pName => $facilities) {
+                $lines[] = "   {$pName}";
+                ksort($facilities, SORT_NATURAL | SORT_FLAG_CASE);
+                foreach ($facilities as $facilityName => $facilitySites) {
+                    usort($facilitySites, function($a, $b) {
+                        $an = (string)($a['site_number'] ?? '');
+                        $bn = (string)($b['site_number'] ?? '');
+                        return strnatcasecmp($an, $bn);
+                    });
+                    // Deduplicate
+                    $numbers = [];
+                    foreach ($facilitySites as $s) {
+                        $num = (string)($s['site_number'] ?? '');
+                        if ($num === '') continue;
+                        if (in_array($num, $numbers, true)) continue;
+                        $numbers[] = $num;
+                    }
+                    // Mark favorites
+                    $rendered = array_map(function($sNum) use ($facilitySites, $favoriteSiteIds) {
+                        $isFav = false;
+                        foreach ($facilitySites as $s) {
+                            if ((string)($s['site_number'] ?? '') === $sNum) {
+                                if (!empty($s['site_id']) && in_array((int)$s['site_id'], $favoriteSiteIds, true)) { $isFav = true; break; }
+                            }
+                        }
+                        return $isFav ? ("★ " . $sNum) : $sNum;
+                    }, $numbers);
+                    $lines[] = "   {$facilityName} (" . count($numbers) . " sites)";
+                    $lines[] = "   Sites: " . implode(', ', $rendered);
+                }
             }
             
             $lines[] = '';
