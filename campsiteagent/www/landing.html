@@ -399,10 +399,23 @@
             document.getElementById('dashboardBtn').style.display = 'inline-block';
             document.querySelector('.cta a[onclick="showRegister()"]').style.display = 'none';
             document.querySelector('.cta a[onclick="showLogin()"]').style.display = 'none';
+          } else {
+            // User not authenticated - hide dashboard button and show auth buttons
+            document.getElementById('dashboardBtn').style.display = 'none';
+            document.querySelector('.cta a[onclick="showRegister()"]').style.display = 'inline-block';
+            document.querySelector('.cta a[onclick="showLogin()"]').style.display = 'inline-block';
           }
+        } else {
+          // API call failed - hide dashboard button and show auth buttons
+          document.getElementById('dashboardBtn').style.display = 'none';
+          document.querySelector('.cta a[onclick="showRegister()"]').style.display = 'inline-block';
+          document.querySelector('.cta a[onclick="showLogin()"]').style.display = 'inline-block';
         }
       } catch (e) {
         // User not logged in, show normal landing page
+        document.getElementById('dashboardBtn').style.display = 'none';
+        document.querySelector('.cta a[onclick="showRegister()"]').style.display = 'inline-block';
+        document.querySelector('.cta a[onclick="showLogin()"]').style.display = 'inline-block';
       }
     }
 
