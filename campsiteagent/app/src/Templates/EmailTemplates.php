@@ -123,6 +123,10 @@ class EmailTemplates
                     // Try to extract a park_number from any site in this facility group
                     foreach ($facilitySites as $s) {
                         if (!empty($s['park_number'])) { $parkNumber = (string)$s['park_number']; break; }
+                        // Fallback for common fields
+                        if (!empty($s['park_number']) === false && !empty($s['park_id'])) {
+                            // No direct fallback without lookup; keep null
+                        }
                     }
                     $parkUrl = $parkNumber ? ("https://reservecalifornia.com/Web/Default.aspx#!park/" . htmlspecialchars($parkNumber)) : "https://reservecalifornia.com/Web/Default.aspx#!";
                     $parkSections .= "<div style='margin-left: 16px; margin-bottom: 8px;'>";

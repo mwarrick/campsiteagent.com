@@ -666,10 +666,14 @@ if ($method === 'POST' && $uri === '/api/admin/notifications/daily-run') {
                 $stmt->execute($params);
                 $rows = $stmt->fetchAll();
 
-                // Group by park/site
+                // Group by park/site and track park_number
                 $byPark = [];
+                $parkNumberByName = [];
                 foreach ($rows as $r) {
                     $parkName = $r['park_name'];
+                    if (!isset($parkNumberByName[$parkName]) && !empty($r['park_number'])) {
+                        $parkNumberByName[$parkName] = $r['park_number'];
+                    }
                     $key = $r['site_number'] . '|' . ($r['site_name'] ?? '') . '|' . ($r['site_type'] ?? '');
                     if (!isset($byPark[$parkName])) { $byPark[$parkName] = []; }
                     if (!isset($byPark[$parkName][$key])) {
@@ -727,6 +731,7 @@ if ($method === 'POST' && $uri === '/api/admin/notifications/daily-run') {
                                 'site_type' => $s['site_type'] ?? '',
                                 'facility_name' => $s['facility_name'] ?? '',
                                 'park_name' => $parkName,
+                                'park_number' => $parkNumberByName[$parkName] ?? null,
                                 'weekend_dates' => $weekendDates
                             ];
                         }
