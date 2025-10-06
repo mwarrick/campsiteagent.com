@@ -124,6 +124,89 @@
       }
     }
     
+    /* iPhone 12/13/14 (390px) and similar devices */
+    @media (max-width: 390px) {
+      .container {
+        padding: 16px 12px;
+      }
+      
+      .hero {
+        padding: 32px 20px;
+        border-radius: 12px;
+      }
+      
+      h1 {
+        font-size: 1.9rem;
+        margin-bottom: 12px;
+        line-height: 1.2;
+      }
+      
+      .subtitle {
+        font-size: 1rem;
+        margin-bottom: 24px;
+        line-height: 1.4;
+      }
+      
+      .features {
+        gap: 16px;
+        margin: 24px 0;
+      }
+      
+      .feature {
+        padding: 20px 16px;
+        border-radius: 10px;
+      }
+      
+      .feature h3 {
+        font-size: 1rem;
+        margin-bottom: 10px;
+      }
+      
+      .feature p {
+        font-size: 0.9rem;
+        line-height: 1.5;
+      }
+      
+      .cta {
+        margin-top: 24px;
+      }
+      
+      .btn {
+        padding: 12px 20px;
+        font-size: 0.95rem;
+        margin: 6px 0;
+      }
+      
+      .auth-section {
+        margin-top: 20px;
+        padding-top: 20px;
+      }
+      
+      .auth-section p {
+        font-size: 0.9rem;
+        margin-bottom: 12px;
+      }
+      
+      .auth-section input {
+        padding: 10px;
+        font-size: 16px;
+        margin: 6px 0;
+      }
+      
+      .auth-section button {
+        padding: 10px;
+        font-size: 16px;
+        margin: 6px 0;
+      }
+      
+      #registerMessage,
+      #loginMessage {
+        font-size: 0.85rem;
+        padding: 6px 10px;
+        margin: 6px 0;
+      }
+    }
+    
     @media (max-width: 480px) {
       .container {
         padding: 16px 12px;
@@ -208,14 +291,14 @@
 
       <div class="auth-section" id="authSection" style="display: none;">
         <p>Enter your email to start receiving availability alerts:</p>
-        <input type="email" id="emailInput" placeholder="your@email.com" style="padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; width: 300px; margin-right: 10px;">
+        <input type="email" id="emailInput" placeholder="your@email.com" style="padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; width: 300px; margin-right: 10px; max-width: 100%; box-sizing: border-box;">
         <button onclick="register()" style="padding: 12px 20px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer;">Register</button>
         <p id="registerMessage" style="margin-top: 15px; font-size: 0.9rem;"></p>
       </div>
 
       <div class="auth-section" id="loginSection" style="display: none;">
         <p>Enter your email to receive a login link:</p>
-        <input type="email" id="loginEmailInput" placeholder="your@email.com" style="padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; width: 300px; margin-right: 10px;">
+        <input type="email" id="loginEmailInput" placeholder="your@email.com" style="padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; width: 300px; margin-right: 10px; max-width: 100%; box-sizing: border-box;">
         <button onclick="login()" style="padding: 12px 20px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer;">Send Login Link</button>
         <p id="loginMessage" style="margin-top: 15px; font-size: 0.9rem;"></p>
       </div>
