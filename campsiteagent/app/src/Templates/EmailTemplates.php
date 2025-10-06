@@ -119,7 +119,12 @@ class EmailTemplates
                         return $isFav ? "<span style='color:#d97706; font-weight:600;'>★ {$safeNum}</span>" : $safeNum;
                     }, $numbers);
 
-                    $parkUrl = "https://reservecalifornia.com/Web/Default.aspx#!";
+                    $parkNumber = null;
+                    // Try to extract a park_number from any site in this facility group
+                    foreach ($facilitySites as $s) {
+                        if (!empty($s['park_number'])) { $parkNumber = (string)$s['park_number']; break; }
+                    }
+                    $parkUrl = $parkNumber ? ("https://reservecalifornia.com/Web/Default.aspx#!park/" . htmlspecialchars($parkNumber)) : "https://reservecalifornia.com/Web/Default.aspx#!";
                     $parkSections .= "<div style='margin-left: 16px; margin-bottom: 8px;'>";
                     $parkSections .= "<div style='font-weight: 500; color: #059669; font-size: 14px;'>";
                     $parkSections .= htmlspecialchars($facilityName) . " (" . count($numbers) . " sites) ";
@@ -217,7 +222,12 @@ class EmailTemplates
                         }
                         return $isFav ? ("★ " . $sNum) : $sNum;
                     }, $numbers);
+                    // Include park link with number if available
+                    $parkNumber = null;
+                    foreach ($facilitySites as $s) { if (!empty($s['park_number'])) { $parkNumber = (string)$s['park_number']; break; } }
+                    $parkUrlText = $parkNumber ? ("https://reservecalifornia.com/Web/Default.aspx#!park/" . $parkNumber) : "https://reservecalifornia.com/Web/Default.aspx#!";
                     $lines[] = "   {$facilityName} (" . count($numbers) . " sites)";
+                    $lines[] = "   View: {$parkUrlText}";
                     $lines[] = "   Sites: " . implode(', ', $rendered);
                 }
             }

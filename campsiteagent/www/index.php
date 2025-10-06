@@ -523,7 +523,7 @@ if ($method === 'POST' && $uri === '/api/admin/notifications/daily-test') {
 
         // Pull all upcoming availability with facility and park info
         $sql = 'SELECT p.id AS park_id, p.name AS park_name, p.park_number,
-                       s.site_number, s.site_name, s.site_type,
+                       s.id AS site_id, s.site_number, s.site_name, s.site_type,
                        f.name AS facility_name, a.date
                 FROM parks p
                 JOIN sites s ON s.park_id = p.id
@@ -535,12 +535,15 @@ if ($method === 'POST' && $uri === '/api/admin/notifications/daily-test') {
 
         // Group by park and site, collect dates
         $byPark = [];
+        $parkNumberByName = [];
         foreach ($rows as $r) {
             $park = $r['park_name'];
+            $parkNumberByName[$park] = $r['park_number'] ?? null;
             $key = $r['site_number'] . '|' . ($r['site_name'] ?? '') . '|' . ($r['site_type'] ?? '');
             if (!isset($byPark[$park])) { $byPark[$park] = []; }
             if (!isset($byPark[$park][$key])) {
                 $byPark[$park][$key] = [
+                    'site_id' => $r['site_id'] ?? null,
                     'site_number' => $r['site_number'],
                     'site_name' => $r['site_name'],
                     'site_type' => $r['site_type'],
@@ -577,6 +580,7 @@ if ($method === 'POST' && $uri === '/api/admin/notifications/daily-test') {
                         'site_type' => $s['site_type'] ?? '',
                         'facility_name' => $s['facility_name'] ?? '',
                         'park_name' => $park,
+                        'park_number' => $parkNumberByName[$park] ?? null,
                         'weekend_dates' => $weekendDates
                     ];
                 }
@@ -604,6 +608,145 @@ if ($method === 'POST' && $uri === '/api/admin/notifications/daily-test') {
         $ok = $notify->sendAvailabilityAlert($to, 'Daily Digest', $dateRangeStr, $alertSites, $favoriteSiteIds);
 
         json(200, ['sent' => $ok, 'to' => $to, 'sites' => count($alertSites), 'dateRange' => $dateRangeStr]);
+    } catch (\Throwable $e) {
+        json(500, ['error' => $e->getMessage()]);
+    }
+}
+
+// Admin: send daily digests honoring each user's alert preferences (manual trigger)
+if ($method === 'POST' && $uri === '/api/admin/notifications/daily-run') {
+    header('Content-Type: application/json');
+    $uid = requireAuth();
+    requireAdmin($uid);
+
+    try {
+        $pdo = Database::getConnection();
+        $notify = new \CampsiteAgent\Services\NotificationService();
+        $favRepo = new \CampsiteAgent\Repositories\UserFavoritesRepository();
+
+        // Users with at least one enabled preference
+        $users = $pdo->query('SELECT DISTINCT u.id, u.email, u.first_name
+                              FROM users u
+                              JOIN user_alert_preferences p ON p.user_id = u.id AND p.enabled = 1
+                              WHERE u.verified_at IS NOT NULL AND (u.active IS NULL OR u.active = 1)')->fetchAll();
+
+        $sent = 0; $failed = 0; $skipped = 0; $details = [];
+
+        foreach ($users as $user) {
+            $userId = (int)$user['id'];
+
+            // Load preferences
+            $st = $pdo->prepare('SELECT * FROM user_alert_preferences WHERE user_id = :uid AND enabled = 1');
+            $st->execute([':uid' => $userId]);
+            $prefs = $st->fetchAll();
+            if (empty($prefs)) { $skipped++; continue; }
+
+            $userAlertSites = [];
+            $allFridays = [];
+
+            foreach ($prefs as $pref) {
+                $parkFilterSql = '';
+                $params = [];
+                if (!empty($pref['park_id'])) {
+                    $parkFilterSql = ' AND p.id = :parkId';
+                    $params[':parkId'] = (int)$pref['park_id'];
+                }
+
+                // Upcoming availability (limit by park if specified)
+                $sql = 'SELECT p.id AS park_id, p.name AS park_name, p.park_number,
+                               s.id AS site_id, s.site_number, s.site_name, s.site_type,
+                               f.name AS facility_name, a.date
+                        FROM parks p
+                        JOIN sites s ON s.park_id = p.id
+                        LEFT JOIN facilities f ON s.facility_id = f.id
+                        JOIN site_availability a ON a.site_id = s.id
+                        WHERE a.is_available = 1 AND a.date >= CURDATE()' . $parkFilterSql . '
+                        ORDER BY p.name, a.date ASC, s.site_number ASC';
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($params);
+                $rows = $stmt->fetchAll();
+
+                // Group by park/site
+                $byPark = [];
+                foreach ($rows as $r) {
+                    $parkName = $r['park_name'];
+                    $key = $r['site_number'] . '|' . ($r['site_name'] ?? '') . '|' . ($r['site_type'] ?? '');
+                    if (!isset($byPark[$parkName])) { $byPark[$parkName] = []; }
+                    if (!isset($byPark[$parkName][$key])) {
+                        $byPark[$parkName][$key] = [
+                            'site_id' => (int)$r['site_id'],
+                            'site_number' => $r['site_number'],
+                            'site_name' => $r['site_name'],
+                            'site_type' => $r['site_type'],
+                            'facility_name' => $r['facility_name'],
+                            'dates' => []
+                        ];
+                    }
+                    $byPark[$parkName][$key]['dates'][] = $r['date'];
+                }
+
+                $startDate = $pref['start_date'] ?? null;
+                $endDate = $pref['end_date'] ?? null;
+                $weekendOnlyPref = isset($pref['weekend_only']) ? ((int)$pref['weekend_only'] === 1) : true;
+
+                foreach ($byPark as $parkName => $sites) {
+                    foreach ($sites as $s) {
+                        $dateSet = array_fill_keys($s['dates'], true);
+                        $weekendDates = [];
+                        if ($weekendOnlyPref) {
+                            foreach ($s['dates'] as $d) {
+                                $ts = strtotime($d);
+                                if ((int)date('w', $ts) === 5) {
+                                    $fri = date('Y-m-d', $ts);
+                                    $sat = date('Y-m-d', $ts + 86400);
+                                    if (isset($dateSet[$sat])) {
+                                        if ($startDate && $fri < $startDate) continue;
+                                        if ($endDate && $fri > $endDate) continue;
+                                        $weekendDates[] = ['fri' => $fri, 'sat' => $sat];
+                                        $allFridays[] = $fri;
+                                    }
+                                }
+                            }
+                        } else {
+                            // Non-weekend mode: include individual available dates within window
+                            foreach ($s['dates'] as $d) {
+                                if ($startDate && $d < $startDate) continue;
+                                if ($endDate && $d > $endDate) continue;
+                                // Represent single-date as fri=same, sat=next for consistent rendering
+                                $fri = $d; $sat = date('Y-m-d', strtotime($d) + 86400);
+                                $weekendDates[] = ['fri' => $fri, 'sat' => $sat];
+                                $allFridays[] = $fri;
+                            }
+                        }
+
+                        if (!empty($weekendDates)) {
+                            $userAlertSites[] = [
+                                'site_id' => $s['site_id'],
+                                'site_number' => $s['site_number'],
+                                'site_name' => $s['site_name'] ?? '',
+                                'site_type' => $s['site_type'] ?? '',
+                                'facility_name' => $s['facility_name'] ?? '',
+                                'park_name' => $parkName,
+                                'weekend_dates' => $weekendDates
+                            ];
+                        }
+                    }
+                }
+            }
+
+            if (empty($userAlertSites)) { $skipped++; continue; }
+
+            $earliest = !empty($allFridays) ? min($allFridays) : date('Y-m-d');
+            $latest = !empty($allFridays) ? max($allFridays) : date('Y-m-d');
+            $dateRangeStr = date('n/j', strtotime($earliest)) . '-' . date('n/j/Y', strtotime($latest));
+
+            $favoriteSiteIds = $favRepo->listFavoriteSiteIds($userId);
+            $ok = $notify->sendAvailabilityAlert($user['email'], 'Daily Digest', $dateRangeStr, $userAlertSites, $favoriteSiteIds);
+            if ($ok) { $sent++; $details[] = ['email' => $user['email'], 'sites' => count($userAlertSites)]; }
+            else { $failed++; }
+        }
+
+        json(200, ['sent' => $sent, 'failed' => $failed, 'skipped' => $skipped, 'details' => $details]);
     } catch (\Throwable $e) {
         json(500, ['error' => $e->getMessage()]);
     }
