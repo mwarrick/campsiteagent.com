@@ -524,7 +524,7 @@ if ($method === 'POST' && $uri === '/api/admin/notifications/daily-test') {
         // Pull all upcoming availability with facility and park info
         $sql = 'SELECT p.id AS park_id, p.name AS park_name, p.park_number,
                        s.id AS site_id, s.site_number, s.site_name, s.site_type,
-                       f.name AS facility_name, a.date
+                       f.name AS facility_name, f.facility_id AS facility_external_id, a.date
                 FROM parks p
                 JOIN sites s ON s.park_id = p.id
                 LEFT JOIN facilities f ON s.facility_id = f.id
@@ -579,6 +579,7 @@ if ($method === 'POST' && $uri === '/api/admin/notifications/daily-test') {
                         'site_name' => $s['site_name'] ?? '',
                         'site_type' => $s['site_type'] ?? '',
                         'facility_name' => $s['facility_name'] ?? '',
+                        'facility_external_id' => $s['facility_external_id'] ?? null,
                         'park_name' => $park,
                         'park_number' => $parkNumberByName[$park] ?? null,
                         'weekend_dates' => $weekendDates

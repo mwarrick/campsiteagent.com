@@ -128,7 +128,16 @@ class EmailTemplates
                             // No direct fallback without lookup; keep null
                         }
                     }
-                    $parkUrl = $parkNumber ? ("https://reservecalifornia.com/Web/Default.aspx#!park/" . htmlspecialchars($parkNumber)) : "https://reservecalifornia.com/Web/Default.aspx#!";
+                    // If facility external ID present, include it for deeper context (when supported by site)
+                    $facilityId = null;
+                    foreach ($facilitySites as $s) { if (!empty($s['facility_external_id'])) { $facilityId = (string)$s['facility_external_id']; break; } }
+                    if ($parkNumber && $facilityId) {
+                        $parkUrl = "https://reservecalifornia.com/Web/Default.aspx#!park/" . htmlspecialchars($parkNumber) . "/" . htmlspecialchars($facilityId);
+                    } elseif ($parkNumber) {
+                        $parkUrl = "https://reservecalifornia.com/Web/Default.aspx#!park/" . htmlspecialchars($parkNumber);
+                    } else {
+                        $parkUrl = "https://reservecalifornia.com/Web/Default.aspx#!";
+                    }
                     $parkSections .= "<div style='margin-left: 16px; margin-bottom: 8px;'>";
                     $parkSections .= "<div style='font-weight: 500; color: #059669; font-size: 14px;'>";
                     $parkSections .= htmlspecialchars($facilityName) . " (" . count($numbers) . " sites) ";
