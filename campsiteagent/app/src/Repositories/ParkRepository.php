@@ -43,4 +43,23 @@ class ParkRepository
         $stmt = $this->pdo->prepare('UPDATE parks SET active = :active WHERE id = :id');
         $stmt->execute([':active' => $active ? 1 : 0, ':id' => $parkId]);
     }
+
+    public function createPark(string $name, string $parkNumber, bool $active = true): int
+    {
+        // Store park_number and also mirror into external_id for compatibility
+        $stmt = $this->pdo->prepare('INSERT INTO parks (name, park_number, external_id, active) VALUES (:name, :park_number, :external_id, :active)');
+        $stmt->execute([
+            ':name' => $name,
+            ':park_number' => $parkNumber,
+            ':external_id' => $parkNumber,
+            ':active' => $active ? 1 : 0,
+        ]);
+        return (int)$this->pdo->lastInsertId();
+    }
+
+    public function delete(int $parkId): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM parks WHERE id = :id');
+        $stmt->execute([':id' => $parkId]);
+    }
 }

@@ -1,6 +1,6 @@
 # CampsiteAgent.com
 
-**Version 2.0** - October 2025
+**Version 2.1** - October 2025
 
 Automated monitoring system for California State Park campground availability, focusing on weekend availability at popular Southern California parks.
 
@@ -10,7 +10,7 @@ CampsiteAgent.com is a web application that automatically monitors ReserveCalifo
 
 ## ✨ Features
 
-### ✅ Core Functionality (v2.0)
+### ✅ Core Functionality (v2.1)
 
 - **🔐 User Authentication**: Email-based registration and passwordless login via Gmail API
 - **🌐 Real API Integration**: Direct integration with UseDirect API (ReserveCalifornia backend)
@@ -19,8 +19,17 @@ CampsiteAgent.com is a web application that automatically monitors ReserveCalifo
 - **📊 Interactive Dashboard**: 
   - Weekend-grouped view with facility breakdown
   - Date range filters (30/60/90/180 days)
-  - Real-time availability checking
+  - Real-time availability checking (SSE)
   - CSV export functionality
+- **⭐ Favorites (per user)**:
+  - Global “Manage Favorites” modal (Park → Facility → Sites)
+  - Toggle stars to favorite/unfavorite sites; persists per user
+  - Favorites prioritized in results; “Favorites only” filter supported
+  - Colored star displayed next to favorites in results
+  - Facilities/weekends with zero favorite matches are hidden in favorites-only mode
+- **♻️ Availability Reconciliation**:
+  - Stale availability cleared within scraped window
+  - `found_at` timestamp reflects latest scrape via `updated_at`
 - **🏗️ Metadata Management**: Full park, facility, and site metadata tracking
 - **⚙️ Admin Controls**: Park activation, facility management, metadata sync
 - **👥 User Preferences**: Customizable alert preferences per user
@@ -111,6 +120,9 @@ campsiteagent/
    mysql -u root -p your_database_name < migrations/011_create_user_alert_preferences.sql
    mysql -u root -p your_database_name < migrations/012_add_popular_socal_parks.sql
    mysql -u root -p your_database_name < migrations/013_add_user_selected_parks.sql
+   # New in v2.1
+   mysql -u root -p your_database_name < migrations/014_add_updated_at_to_site_availability.sql
+   mysql -u root -p your_database_name < migrations/015_create_user_favorites.sql
    ```
 
 4. **Configure environment variables**
@@ -199,6 +211,13 @@ Access the application at `http://127.0.0.1:8080`
 - `POST /api/check-now` - Trigger manual availability check (admin)
 
 ### Admin Endpoints
+### Favorites & Metadata Endpoints
+
+- `GET /api/favorites` — List current user’s favorite site IDs
+- `POST /api/favorites/{siteId}/toggle` — Toggle favorite for a site
+- `GET /api/parks/{parkId}/facilities` — List active facilities for a park
+- `GET /api/facilities/{facilityId}/sites` — List all sites for a facility with `favorite` flag
+
 
 - `GET /api/admin/parks` - List all parks
 - `POST /api/admin/parks` - Create/update park

@@ -199,6 +199,9 @@
       <div id="authSection">
         <span id="userInfo" style="display: none;"></span>
         <button id="preferencesBtn" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); display: none;">⚙️ Preferences</button>
+        <button id="manageFavoritesGlobal" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); margin-left: 8px; display: none;">★ Manage Favorites</button>
+        <button id="adminScraping" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); margin-left: 8px; display: none;">🔧 Admin Scraping</button>
+        <button id="adminUsers" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); margin-left: 8px; display: none;">👥 User Management</button>
         <button id="loginBtn" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); margin-left: 8px;">Login</button>
         <button id="registerBtn" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); margin-left: 8px;">Register</button>
         <button id="logoutBtn" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); margin-left: 8px; display: none;">Logout</button>
@@ -238,13 +241,20 @@
           <option value="desc">Descending</option>
         </select>
       </label>
+      <label>
+        <input type="checkbox" id="favoritesOnly" /> Favorites only
+      </label>
       <button id="apply">Apply</button>
       <button id="export">Export CSV</button>
-      <button id="adminScraping" style="background: #7c3aed; margin-left: auto; display: none;">🔧 Admin Scraping</button>
-      <button id="adminUsers" style="background: #059669; margin-left: 8px; display: none;">👥 User Management</button>
+    </div>
+    <div id="refreshNotice" class="card" style="display:none; background: #fff7ed; border-left: 4px solid #f59e0b; color: #92400e; padding: 10px 12px; font-size: 14px;">
+      🔄 Refreshing data...
     </div>
     <div class="card" style="background: #eef2ff; border-left: 4px solid #4c51bf; padding: 12px 16px;">
       <strong>ℹ️ Note:</strong> Click "View" links to go to the ReserveCalifornia booking page. You'll need to manually select the dates shown below, as direct booking links are not supported by their website.
+      <div style="margin-top:6px; font-size: 13px; color:#374151;">
+        Tip: Click the star (☆/★) next to a site to mark it as a favorite. Favorites are shown first.
+      </div>
     </div>
     <div id="summary" class="summary" style="display:none"></div>
     <div id="content"></div>
@@ -302,9 +312,33 @@
     </div>
   </div>
 
+  <!-- Manage Favorites Modal (Global and per-facility) -->
+  <div id="manageFavModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="manageFavTitle">Manage Favorites</h2>
+        <button class="close-btn" onclick="closeManageFavorites()">✕ Close</button>
+      </div>
+      <div class="pref-form" style="margin-bottom: 12px;">
+        <div class="form-row">
+          <label>
+            Park
+            <select id="favParkSelect"></select>
+          </label>
+          <label>
+            Facility
+            <select id="favFacilitySelect" disabled></select>
+          </label>
+        </div>
+      </div>
+      <div id="manageFavBody">Select a park and facility to view sites…</div>
+    </div>
+  </div>
+
 
   <script>
     let state = { parkId: '', weekendOnly: true, dateRange: '30', page: 1, pageSize: 9999, sortBy: 'date', sortDir: 'asc' };
+    let favoriteSiteIds = new Set();
 
     let allParks = [];
 
@@ -324,6 +358,146 @@
         prefSelect.innerHTML = '<option value="">All Parks</option>' + parks.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
       }
     }
+
+    async function loadFavorites() {
+      try {
+        const res = await fetch('/api/favorites');
+        if (res.ok) {
+          const data = await res.json();
+          favoriteSiteIds = new Set((data.siteIds || []).map(Number));
+        }
+      } catch (_) {}
+    }
+
+    async function toggleFavorite(siteId) {
+      try {
+        const res = await fetch(`/api/favorites/${siteId}/toggle`, { method: 'POST' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.favorite) favoriteSiteIds.add(Number(siteId)); else favoriteSiteIds.delete(Number(siteId));
+          // Re-render current view to update star and ordering
+          loadData();
+        }
+      } catch (_) {}
+    }
+
+    // Manage Favorites modal logic (per-facility)
+    async function openManageFavorites(facilityId, facilityName) {
+      const modal = document.getElementById('manageFavModal');
+      const body = document.getElementById('manageFavBody');
+      const parkSelect = document.getElementById('favParkSelect');
+      const facSelect = document.getElementById('favFacilitySelect');
+      // Preselects not used for per-facility open; disable selects in this mode
+      parkSelect.disabled = true;
+      facSelect.disabled = true;
+      body.innerHTML = 'Loading…';
+      modal.classList.add('show');
+
+      try {
+        const res = await fetch(`/api/facilities/${facilityId}/sites`);
+        const data = await res.json();
+        const sites = (data.sites || []).slice();
+        sites.sort((a,b) => {
+          const af = !!a.favorite; const bf = !!b.favorite;
+          if (af === bf) return String(a.site_number).localeCompare(String(b.site_number));
+          return af ? -1 : 1;
+        });
+
+        body.innerHTML = `
+          <div style="margin-bottom:12px; color:#4b5563;">Click a star to add/remove favorites. This list shows all sites for the facility, regardless of availability.</div>
+          <div id="manageFavList">
+            ${sites.map(s => {
+              const star = s.favorite ? '★' : '☆';
+              return `<div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #e5e7eb;">
+                <div>Site ${s.site_number} ${s.site_name ? `— ${s.site_name}` : ''}</div>
+                <div style="cursor:pointer;" onclick="toggleFavorite(${s.site_id}); this.textContent = (this.textContent === '★' ? '☆' : '★');">${star}</div>
+              </div>`;
+            }).join('')}
+          </div>
+        `;
+      } catch (e) {
+        body.innerHTML = '<div style="color:#e53e3e;">Failed to load sites</div>';
+      }
+    }
+
+    // Global Manage Favorites flow
+    async function openManageFavoritesGlobal() {
+      const modal = document.getElementById('manageFavModal');
+      const body = document.getElementById('manageFavBody');
+      const parkSelect = document.getElementById('favParkSelect');
+      const facSelect = document.getElementById('favFacilitySelect');
+      document.getElementById('manageFavTitle').textContent = 'Manage Favorites';
+      parkSelect.disabled = false;
+      facSelect.disabled = true;
+      body.innerHTML = 'Select a park and facility to view sites…';
+      modal.classList.add('show');
+
+      // Populate parks
+      const parks = allParks || [];
+      parkSelect.innerHTML = '<option value="">Select…</option>' + parks.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+      facSelect.innerHTML = '<option value="">Select…</option>';
+
+      parkSelect.onchange = async () => {
+        const pid = parkSelect.value;
+        body.innerHTML = 'Select a facility…';
+        facSelect.disabled = true;
+        facSelect.innerHTML = '<option value="">Select…</option>';
+        if (!pid) return;
+        try {
+          const res = await fetch(`/api/parks/${pid}/facilities`);
+          const data = await res.json();
+          const facs = data.facilities || [];
+          facSelect.innerHTML = '<option value="">Select…</option>' + facs.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
+          facSelect.disabled = false;
+        } catch (e) {
+          facSelect.innerHTML = '<option value="">(Failed to load)</option>';
+        }
+      };
+
+      facSelect.onchange = async () => {
+        const fid = facSelect.value;
+        if (!fid) { body.innerHTML = 'Select a facility…'; return; }
+        await renderFacilitySites(fid);
+      };
+    }
+
+    async function renderFacilitySites(facilityId) {
+      const body = document.getElementById('manageFavBody');
+      body.innerHTML = 'Loading…';
+      try {
+        const res = await fetch(`/api/facilities/${facilityId}/sites`);
+        const data = await res.json();
+        const sites = (data.sites || []).slice();
+        sites.sort((a,b) => {
+          const af = !!a.favorite; const bf = !!b.favorite;
+          if (af === bf) return String(a.site_number).localeCompare(String(b.site_number));
+          return af ? -1 : 1;
+        });
+        body.innerHTML = `
+          <div style="margin-bottom:12px; color:#4b5563;">Click a star to add/remove favorites. This lists all sites for the facility, regardless of availability.</div>
+          <div id="manageFavList">
+            ${sites.map(s => {
+              const star = s.favorite ? '★' : '☆';
+              return `<div style=\"display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #e5e7eb;\">
+                <div>Site ${s.site_number} ${s.site_name ? `— ${s.site_name}` : ''}</div>
+                <div style=\"cursor:pointer;\" onclick=\"toggleFavorite(${s.site_id}); this.textContent = (this.textContent === '★' ? '☆' : '★');\">${star}</div>
+              </div>`;
+            }).join('')}
+          </div>
+        `;
+      } catch (e) {
+        body.innerHTML = '<div style="color:#e53e3e;">Failed to load sites</div>';
+      }
+    }
+
+    function closeManageFavorites() {
+      document.getElementById('manageFavModal').classList.remove('show');
+    }
+
+    // Close modal when clicking outside
+    document.getElementById('manageFavModal').addEventListener('click', (e) => {
+      if (e.target.id === 'manageFavModal') closeManageFavorites();
+    });
 
     function qs() {
       const q = new URLSearchParams();
@@ -395,12 +569,15 @@
     }
 
     async function loadData() {
+      const notice = document.getElementById('refreshNotice');
+      notice.style.display = '';
       const res = await fetch('/api/availability/latest?' + qs());
       const container = document.getElementById('content');
       document.getElementById('pageInfo').textContent = `Page ${state.page}`;
       if (!res.ok) {
         document.getElementById('summary').style.display = 'none';
         container.innerHTML = '<div class="card">Failed to load availability.</div>';
+        notice.style.display = 'none';
         return;
       }
       const text = await res.text();
@@ -410,6 +587,7 @@
       renderSummary(data);
       if (data.length === 0) {
         container.innerHTML = '<div class="card"><span class="empty">No upcoming availability found.</span></div>';
+        notice.style.display = 'none';
         return;
       }
       // Group by weekend if weekend-only is enabled
@@ -470,9 +648,25 @@
               byFacility[facilityName].push(s);
             });
             
-            // Build facility sections with booking links
+            // Build facility sections with booking links; skip facilities with 0 sites after filtering
+            let totalShownInWeekend = 0;
             const facilitySections = Object.keys(byFacility).sort().map(facilityName => {
-              const sites = byFacility[facilityName];
+              let sites = byFacility[facilityName].slice();
+              // If favorites only is selected, filter to favorites
+              const favOnly = document.getElementById('favoritesOnly')?.checked;
+              if (favOnly) {
+                sites = sites.filter(s => favoriteSiteIds.has(s.site_id));
+              }
+              // Skip this facility if no sites remain
+              if (!sites.length) return '';
+              // Sort favorites first
+              sites.sort((a,b) => {
+                const af = favoriteSiteIds.has(a.site_id);
+                const bf = favoriteSiteIds.has(b.site_id);
+                if (af === bf) return String(a.site_number).localeCompare(String(b.site_number));
+                return af ? -1 : 1;
+              });
+              totalShownInWeekend += sites.length;
               const siteNumbers = sites.map(s => s.site_number).join(', ');
               
               // Link to park page (ReserveCalifornia doesn't support deep linking with dates)
@@ -491,17 +685,27 @@
                     <a href="${bookUrl}" target="_blank" style="margin-left: 8px; font-size: 12px; color: #2563eb; text-decoration: none;">→ View</a>
                     ${foundLabel ? `<span style=\"margin-left:8px; font-size:12px; color:#4a5568;\">${foundLabel}</span>` : ''}
                   </div>
-                  <div style="font-size: 13px; color: #6b7280; margin-left: 8px;">${siteNumbers}</div>
+                  <div style="font-size: 13px; color: #6b7280; margin-left: 8px;">
+                    ${sites.map(s => {
+                      const fav = favoriteSiteIds.has(s.site_id);
+                      return fav
+                        ? `<span style=\"margin-right: 10px; white-space: nowrap;\"><span style=\"color:#f59e0b;\">★</span> ${s.site_number}</span>`
+                        : `<span style=\"margin-right: 10px; white-space: nowrap;\">${s.site_number}</span>`;
+                    }).join(' ')}
+                  </div>
                 </div>
               `;
-            }).join('');
+            }).filter(Boolean).join('');
+
+            // If nothing to show for this weekend after filtering, skip entire weekend section
+            if (!totalShownInWeekend) return '';
             
             return `
               <div style="margin-bottom: 20px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
                 <div style="font-weight: 600; color: #2563eb; margin-bottom: 8px;">
                   📅 ${friFormatted} - ${satFormatted}
                 </div>
-                <div style="font-size: 14px; color: #4b5563; margin-bottom: 8px;">${weekend.sites.length} sites available</div>
+                <div style="font-size: 14px; color: #4b5563; margin-bottom: 8px;">${totalShownInWeekend} site${totalShownInWeekend === 1 ? '' : 's'} available</div>
                 ${facilitySections}
               </div>
             `;
@@ -520,6 +724,7 @@
           return `<div class="card"><div class="park">${park.park}</div>${sites || '<div class="empty">No sites available.</div>'}</div>`;
         }).join('');
       }
+      notice.style.display = 'none';
     }
 
     document.getElementById('apply').addEventListener('click', () => {
@@ -529,6 +734,11 @@
       state.sortBy = document.getElementById('sortBy').value;
       state.sortDir = document.getElementById('sortDir').value;
       state.page = 1;
+      loadData();
+    });
+
+    // Also reapply immediately when toggling Favorites only (for responsiveness)
+    document.getElementById('favoritesOnly').addEventListener('change', () => {
       loadData();
     });
     document.getElementById('prev').addEventListener('click', () => {
@@ -704,6 +914,7 @@
           document.getElementById('loginBtn').style.display = 'none';
           document.getElementById('registerBtn').style.display = 'none';
           document.getElementById('preferencesBtn').style.display = 'inline';
+          document.getElementById('manageFavoritesGlobal').style.display = 'inline';
           document.getElementById('logoutBtn').style.display = 'inline';
           
           // Show admin buttons for admin users
@@ -931,6 +1142,7 @@
     document.getElementById('loginBtn').addEventListener('click', login);
     document.getElementById('logoutBtn').addEventListener('click', logout);
     document.getElementById('preferencesBtn').addEventListener('click', openPreferences);
+    document.getElementById('manageFavoritesGlobal').addEventListener('click', openManageFavoritesGlobal);
     document.getElementById('adminScraping').addEventListener('click', () => window.location.href = '/admin-scraping.html');
     document.getElementById('adminUsers').addEventListener('click', () => window.location.href = '/admin-users.html');
     
@@ -944,7 +1156,7 @@
 
     // Initialize
     checkAuth();
-    loadParks().then(loadData);
+    loadParks().then(() => loadFavorites()).then(loadData);
 
     // Display session ID for debugging
     function getCookie(name) {

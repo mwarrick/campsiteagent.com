@@ -13,7 +13,7 @@ class HttpClient
         $this->timeoutSec = (int)(getenv('RC_TIMEOUT') ?: 15);
         $this->maxRetries = (int)(getenv('RC_MAX_RETRIES') ?: 3);
         $envUa = getenv('RC_USER_AGENT') ?: null;
-        $this->userAgent = $userAgentOverride ?? $envUa ?? 'CampsiteAgent/1.0 (+http://campsiteagent.com)';
+        $this->userAgent = $userAgentOverride ?? $envUa ?? 'CampsiteAgent/1.0 (+https://campsiteagent.com)';
     }
 
     public function get(string $url, array $headers = []): array

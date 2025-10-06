@@ -55,6 +55,60 @@ if ($method === 'GET' && $uri === '/api/parks') {
     json(200, ['parks' => $repo->listAll()]);
 }
 
+// Public (auth required): list active facilities for a park
+if ($method === 'GET' && preg_match('#^/api/parks/(\\d+)/facilities$#', $uri, $m)) {
+    $uid = requireAuth();
+    $parkId = (int)$m[1];
+    $facRepo = new \CampsiteAgent\Repositories\FacilityRepository();
+    $facilities = $facRepo->findActiveFacilities($parkId);
+    // Return only essential fields
+    $out = array_map(function($f) {
+        return [
+            'id' => (int)$f['id'],
+            'name' => $f['name'],
+            'facility_id' => $f['facility_id'],
+        ];
+    }, $facilities);
+    json(200, ['facilities' => $out]);
+}
+
+// Favorites: list current user's favorite site IDs
+if ($method === 'GET' && $uri === '/api/favorites') {
+    $uid = requireAuth();
+    $repo = new \CampsiteAgent\Repositories\UserFavoritesRepository();
+    json(200, ['siteIds' => $repo->listFavoriteSiteIds($uid)]);
+}
+
+// Favorites: toggle a site favorite
+if ($method === 'POST' && preg_match('#^/api/favorites/(\d+)/toggle$#', $uri, $m)) {
+    $uid = requireAuth();
+    $siteId = (int)$m[1];
+    $repo = new \CampsiteAgent\Repositories\UserFavoritesRepository();
+    $nowFav = $repo->toggleFavorite($uid, $siteId);
+    json(200, ['favorite' => $nowFav]);
+}
+
+// Facilities: list sites for a facility (metadata, not availability)
+if ($method === 'GET' && preg_match('#^/api/facilities/(\d+)/sites$#', $uri, $m)) {
+    $uid = requireAuth();
+    $facilityDbId = (int)$m[1];
+
+    $pdo = Database::getConnection();
+    $stmt = $pdo->prepare('SELECT id AS site_id, site_number, site_name, site_type FROM sites WHERE facility_id = :fid ORDER BY CAST(site_number AS UNSIGNED), site_number');
+    $stmt->execute([':fid' => $facilityDbId]);
+    $sites = $stmt->fetchAll();
+
+    // Mark favorites for this user
+    $favRepo = new \CampsiteAgent\Repositories\UserFavoritesRepository();
+    $favSet = array_fill_keys($favRepo->listFavoriteSiteIds($uid), true);
+    foreach ($sites as &$s) {
+        $s['favorite'] = isset($favSet[(int)$s['site_id']]);
+    }
+    unset($s);
+
+    json(200, ['sites' => $sites]);
+}
+
 // Admin: create park
 if ($method === 'POST' && $uri === '/api/admin/parks') {
     $uid = requireAuth();
@@ -232,8 +286,8 @@ if ($method === 'GET' && $uri === '/api/availability/latest') {
     }
 
     // Don't LIMIT the raw query - we need all dates for each site to detect weekends
-    $sql = 'SELECT p.id AS park_id, p.name AS park_name, p.park_number, s.site_number, s.site_name, s.site_type, 
-                   f.name AS facility_name, a.date, a.created_at AS found_at
+    $sql = 'SELECT p.id AS park_id, p.name AS park_name, p.park_number, s.id AS site_id, s.site_number, s.site_name, s.site_type, 
+                   f.id AS facility_id, f.name AS facility_name, a.date, COALESCE(a.updated_at, a.created_at) AS found_at
             FROM parks p
             JOIN sites s ON s.park_id = p.id
             LEFT JOIN facilities f ON s.facility_id = f.id
@@ -262,10 +316,12 @@ if ($method === 'GET' && $uri === '/api/availability/latest') {
         if (!isset($byPark[$park])) { $byPark[$park] = []; }
         if (!isset($byPark[$park][$key])) {
             $byPark[$park][$key] = [
+                'site_id' => (int)$r['site_id'],
                 'site_number' => $r['site_number'],
                 'site_name' => $r['site_name'],
                 'site_type' => $r['site_type'],
                 'facility_name' => $r['facility_name'],
+                'facility_id' => isset($r['facility_id']) ? (int)$r['facility_id'] : null,
                 'dates' => [],
                 'found_at' => $r['found_at']
             ];

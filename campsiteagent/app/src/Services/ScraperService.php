@@ -154,6 +154,50 @@ class ScraperService
                     }
                 }
 
+                // Reconcile: mark dates in the selected window that disappeared as unavailable
+                if (!empty($siteEntries)) {
+                    // Determine the scraped date window across all entries
+                    $minScrapedDate = null;
+                    $maxScrapedDate = null;
+                    foreach ($siteEntries as $se) {
+                        foreach ($se['dates'] as $d => $avail) {
+                            if ($minScrapedDate === null || $d < $minScrapedDate) { $minScrapedDate = $d; }
+                            if ($maxScrapedDate === null || $d > $maxScrapedDate) { $maxScrapedDate = $d; }
+                        }
+                    }
+
+                    if ($minScrapedDate && $maxScrapedDate) {
+                        $totalReconciled = 0;
+                        // For each site we just processed, compute its now-available dates and reconcile
+                        foreach ($siteEntries as $se) {
+                            $siteIdForRecon = $this->sites->upsertSite(
+                                (int)$park['id'],
+                                $se['site_number'],
+                                $se['site_type'] ?? null,
+                                [],
+                                $se['facility_db_id'] ?? null,
+                                $se['site_name'] ?? null,
+                                $se['unit_type_id'] ?? null,
+                                $se['is_ada'] ?? false,
+                                $se['vehicle_length'] ?? 0
+                            );
+                            // Build list of available dates from the latest scrape for this site
+                            $nowAvailable = [];
+                            foreach ($se['dates'] as $d => $avail) {
+                                if ($avail) { $nowAvailable[] = $d; }
+                            }
+                            $totalReconciled += $this->sites->reconcileUnavailableDates($siteIdForRecon, $minScrapedDate, $maxScrapedDate, $nowAvailable);
+                        }
+
+                        if ($progressCallback) {
+                            $progressCallback([
+                                'type' => 'debug',
+                                'message' => "♻️ Reconciled {$totalReconciled} stale date(s) for {$park['name']} between {$minScrapedDate} and {$maxScrapedDate}"
+                            ]);
+                        }
+                    }
+                }
+
                 if ($weekendFound && $this->notify) {
                     // Send to users based on their preferences
                     $notifyResult = $this->notify->sendAvailabilityAlertsToMatchingUsers(

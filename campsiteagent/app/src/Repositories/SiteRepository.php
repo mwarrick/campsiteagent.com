@@ -106,7 +106,9 @@ class SiteRepository
     public function upsertAvailability(int $siteId, string $date, bool $isAvailable): void
     {
         $sql = 'INSERT INTO site_availability (site_id, date, is_available) VALUES (:site_id, :date, :avail)
-                ON DUPLICATE KEY UPDATE is_available = VALUES(is_available)';
+                ON DUPLICATE KEY UPDATE 
+                    is_available = VALUES(is_available),
+                    updated_at = CURRENT_TIMESTAMP';
         $stmt = $this->pdo->prepare($sql);
         
         try {
@@ -120,5 +122,40 @@ class SiteRepository
             error_log("Parameters: siteId=$siteId, date=$date, isAvailable=" . ($isAvailable ? 'true' : 'false'));
             throw $e;
         }
+    }
+
+    /**
+     * Get dates currently marked available for a site within a range.
+     * Returns array of YYYY-MM-DD strings.
+     */
+    public function getAvailableDatesInRange(int $siteId, string $startDate, string $endDate): array
+    {
+        $stmt = $this->pdo->prepare('SELECT date FROM site_availability WHERE site_id = :site_id AND date BETWEEN :start AND :end AND is_available = 1');
+        $stmt->execute([':site_id' => $siteId, ':start' => $startDate, ':end' => $endDate]);
+        $rows = $stmt->fetchAll();
+        $dates = [];
+        foreach ($rows as $r) {
+            $dates[] = $r['date'];
+        }
+        return $dates;
+    }
+
+    /**
+     * Mark as unavailable any dates in [start,end] that are not in the provided set.
+     * $availableDates should contain only dates that are available (true) after the latest scrape.
+     */
+    public function reconcileUnavailableDates(int $siteId, string $startDate, string $endDate, array $availableDates): int
+    {
+        $currentAvailable = $this->getAvailableDatesInRange($siteId, $startDate, $endDate);
+        $newAvailableSet = array_fill_keys($availableDates, true);
+        $changed = 0;
+        foreach ($currentAvailable as $d) {
+            if (!isset($newAvailableSet[$d])) {
+                // This date was previously available but is no longer in the latest scrape → mark unavailable
+                $this->upsertAvailability($siteId, $d, false);
+                $changed++;
+            }
+        }
+        return $changed;
     }
 }
