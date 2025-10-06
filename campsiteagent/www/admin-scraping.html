@@ -505,9 +505,6 @@
         <div id="adminCheck" class="admin-only">
             <h2>🔒 Admin Access Required</h2>
             <p>Checking your permissions...</p>
-            <div id="debugInfo" style="margin-top: 1rem; padding: 1rem; background: #f7fafc; border-radius: 6px; font-family: monospace; font-size: 12px;">
-                <div>Loading...</div>
-            </div>
         </div>
 
         <div id="adminContent" style="display: none;">
@@ -654,18 +651,6 @@
                     const response = await res.json();
                     const user = response.user;
                     
-                    // Debug: log the response to console
-                    console.log('API Response:', response);
-                    console.log('User role:', user ? user.role : 'undefined');
-                    
-                    // Update debug info
-                    document.getElementById('debugInfo').innerHTML = `
-                        <div>✅ Authenticated: ${response.authenticated}</div>
-                        <div>👤 User: ${user ? user.email : 'null'}</div>
-                        <div>🔑 Role: ${user ? user.role : 'null'}</div>
-                        <div>⏰ Time: ${new Date().toLocaleTimeString()}</div>
-                    `;
-                    
                     if (user && user.role === 'admin') {
                         document.getElementById('userInfo').textContent = `Welcome, ${user.email}`;
                         document.getElementById('userInfo').style.display = 'inline';
@@ -753,7 +738,7 @@
             // Start event source
             eventSource = new EventSource(url);
             
-            eventSource.onmessage = function(event) {
+            eventSource.onmessage = async function(event) {
                 try {
                     const data = JSON.parse(event.data);
                     
