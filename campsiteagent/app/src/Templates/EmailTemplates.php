@@ -91,6 +91,12 @@ class EmailTemplates
             $parkUrl = "https://reservecalifornia.com/Web/Default.aspx#!park/712";
             
             foreach ($byFacility as $facilityName => $facilitySites) {
+                // Sort sites alphabetically by site_number within each facility
+                usort($facilitySites, function($a, $b) {
+                    $an = (string)($a['site_number'] ?? '');
+                    $bn = (string)($b['site_number'] ?? '');
+                    return strnatcasecmp($an, $bn);
+                });
                 $siteNumbers = array_map(function($s) {
                     return htmlspecialchars((string)($s['site_number'] ?? ''));
                 }, $facilitySites);
@@ -166,6 +172,12 @@ class EmailTemplates
             $parkUrl = "https://reservecalifornia.com/Web/Default.aspx#!park/712";
             
             foreach ($byFacility as $facilityName => $facilitySites) {
+                // Sort sites alphabetically by site_number within each facility
+                usort($facilitySites, function($a, $b) {
+                    $an = (string)($a['site_number'] ?? '');
+                    $bn = (string)($b['site_number'] ?? '');
+                    return strnatcasecmp($an, $bn);
+                });
                 $siteNumbers = array_map(function($s) {
                     return $s['site_number'] ?? '';
                 }, $facilitySites);

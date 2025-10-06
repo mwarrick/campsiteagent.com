@@ -563,6 +563,7 @@
                     <button id="syncFacilities" class="btn-secondary">🏕️ Sync Facilities</button>
                     <button id="manageFacilities" class="btn-success">⚙️ Manage Facilities</button>
                     <button id="manageParks" class="btn-secondary">🏞️ Manage Parks</button>
+                    <button id="sendDailyDigest" class="btn-success">✉️ Send Test Digest</button>
                 </div>
             </div>
 
@@ -990,6 +991,21 @@
         document.getElementById('syncFacilities').addEventListener('click', syncFacilities);
         document.getElementById('manageFacilities').addEventListener('click', manageFacilities);
         document.getElementById('manageParks').addEventListener('click', () => openParksModal());
+        document.getElementById('sendDailyDigest').addEventListener('click', async () => {
+            try {
+                const res = await fetchWithAuth('/api/admin/notifications/daily-test', { method: 'POST' });
+                const data = await res.json();
+                if (res.ok && data.sent) {
+                    alert(`✅ Daily digest sent to ${data.to} (${data.sites} sites; ${data.dateRange})`);
+                } else if (res.ok && data.message) {
+                    alert(`ℹ️ ${data.message}`);
+                } else {
+                    alert('❌ Failed to send daily digest: ' + (data.error || 'unknown error'));
+                }
+            } catch (e) {
+                alert('❌ Error: ' + e.message);
+            }
+        });
         document.getElementById('closeFacilities').addEventListener('click', closeFacilitiesModal);
         document.getElementById('facilitiesModal').addEventListener('click', (e) => { if (e.target.id === 'facilitiesModal') closeFacilitiesModal(); });
         document.getElementById('facilitiesParkSelect').addEventListener('change', (e) => {
