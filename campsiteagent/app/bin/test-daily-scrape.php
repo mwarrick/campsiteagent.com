@@ -72,8 +72,15 @@ try {
     // Get parks to scrape (limited for testing)
     if ($parkIds) {
         $parks = [];
+        $allParks = $parkRepo->listAll();
         foreach ($parkIds as $id) {
-            $park = $parkRepo->findById($id);
+            $park = null;
+            foreach ($allParks as $p) {
+                if ($p['id'] == $id) {
+                    $park = $p;
+                    break;
+                }
+            }
             if ($park && $park['active']) {
                 $parks[] = $park;
             } else {
