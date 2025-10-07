@@ -287,7 +287,7 @@ if ($method === 'GET' && $uri === '/api/availability/latest') {
 
     // Don't LIMIT the raw query - we need all dates for each site to detect weekends
     $sql = 'SELECT p.id AS park_id, p.name AS park_name, p.park_number, s.id AS site_id, s.site_number, s.site_name, s.site_type, 
-                   f.id AS facility_id, f.name AS facility_name, a.date, COALESCE(a.updated_at, a.created_at) AS found_at
+                   f.id AS facility_id, f.name AS facility_name, a.date, a.created_at AS found_at
             FROM parks p
             JOIN sites s ON s.park_id = p.id
             LEFT JOIN facilities f ON s.facility_id = f.id

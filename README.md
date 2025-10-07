@@ -258,7 +258,7 @@ Access the application at `http://127.0.0.1:8080`
 
 ### Command Line Interface
 
-The system includes a CLI script for automated operations:
+The system includes CLI scripts for automated operations:
 
 ```bash
 # Full scraping with email notifications
@@ -266,6 +266,9 @@ The system includes a CLI script for automated operations:
 
 # Email-only mode (no scraping, uses existing data)
 /usr/bin/php /var/www/campsite-agent/app/bin/check-now.php --dry-run
+
+# Daily automated scraping with optional email notifications
+/usr/bin/php /var/www/campsite-agent/app/bin/daily-scrape.php --notify
 ```
 
 **Cron Job Setup** (for daily automated emails):
@@ -273,6 +276,22 @@ The system includes a CLI script for automated operations:
 # Add to crontab (runs daily at 6 AM)
 0 6 * * * /usr/bin/php /var/www/campsite-agent/app/bin/check-now.php --dry-run
 ```
+
+### Maintenance Scripts
+
+**Fix "Unknown Facility" Issue:**
+```bash
+# Test run (see what would be changed)
+php fix-unknown-facilities.php --dry-run --verbose
+
+# Apply the fix
+php fix-unknown-facilities.php --verbose
+
+# Quick fix (minimal output)
+php fix-unknown-facilities.php
+```
+
+This script addresses the common issue where sites have NULL facility_id, causing the dashboard to display "Unknown Facility" instead of actual facility names. Run this after scraping new parks or if you see "Unknown Facility" on the dashboard.
 
 ## 🔧 Configuration
 
@@ -314,10 +333,15 @@ php_value max_execution_time 300
 
 ### Common Issues
 
-1. **SQL Parameter Errors**: Ensure all database migrations are run in order
-2. **Email Not Working**: Verify Gmail API credentials and permissions
-3. **Scraping Failures**: Check network connectivity and API rate limits
-4. **Permission Errors**: Ensure Apache has write access to log directories
+1. **"Unknown Facility" on Dashboard**: Sites have NULL facility_id
+   ```bash
+   # Fix with maintenance script
+   php fix-unknown-facilities.php --verbose
+   ```
+2. **SQL Parameter Errors**: Ensure all database migrations are run in order
+3. **Email Not Working**: Verify Gmail API credentials and permissions
+4. **Scraping Failures**: Check network connectivity and API rate limits
+5. **Permission Errors**: Ensure Apache has write access to log directories
 
 ### Debug Mode
 
