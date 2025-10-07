@@ -143,7 +143,7 @@ try {
     
     // Update run record
     $runRepo->updateDailyRun($runId, [
-        'status' => 'completed',
+        'status' => 'success',
         'finished_at' => date('Y-m-d H:i:s'),
         'error' => null
     ]);
