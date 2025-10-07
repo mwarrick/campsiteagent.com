@@ -246,6 +246,7 @@
       </label>
       <button id="apply">Apply</button>
       <button id="export">Export CSV</button>
+      <button id="sendDigest" style="background: #059669;">📧 Email Digest Now</button>
     </div>
     <div id="refreshNotice" class="card" style="display:none; background: #fff7ed; border-left: 4px solid #f59e0b; color: #92400e; padding: 10px 12px; font-size: 14px;">
       🔄 Refreshing data...
@@ -742,6 +743,35 @@
     document.getElementById('export').addEventListener('click', () => {
       const url = '/api/availability/export.csv?' + qs();
       window.open(url, '_blank');
+    });
+
+    // Send digest email
+    document.getElementById('sendDigest').addEventListener('click', async () => {
+      const btn = document.getElementById('sendDigest');
+      const originalText = btn.textContent;
+      
+      btn.disabled = true;
+      btn.textContent = '📧 Sending...';
+      
+      try {
+        const res = await fetchWithAuth('/api/user/send-digest', { method: 'POST' });
+        const data = await res.json();
+        
+        if (res.ok) {
+          if (data.sent) {
+            alert(`✅ Digest sent successfully!\n\nFound ${data.sites} sites available from ${data.dateRange}\nCheck your email for the full digest.`);
+          } else {
+            alert(`ℹ️ ${data.message}`);
+          }
+        } else {
+          alert('❌ Error: ' + (data.error || 'Failed to send digest'));
+        }
+      } catch (e) {
+        alert('❌ Error: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+      }
     });
 
     

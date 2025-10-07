@@ -45,7 +45,7 @@ class EmailTemplates
         return "Weekend availability found for {$dateRange}: {$parkName}";
     }
 
-    public static function alertHtml(string $parkName, string $dateRange, array $sites, array $favoriteSiteIds = []): string
+    public static function alertHtml(string $parkName, string $dateRange, array $sites, array $favoriteSiteIds = [], string $disableUrl = ''): string
     {
         $park = htmlspecialchars($parkName);
         $range = htmlspecialchars($dateRange);
@@ -155,16 +155,22 @@ class EmailTemplates
             $sections .= "</div>";
         }
         
-        return "<p><strong>Weekend availability found!</strong></p><p>Park: <strong>{$park}</strong></p><div style='background: #eef2ff; border-left: 4px solid #4c51bf; padding: 12px; margin: 12px 0;'><strong>ℹ️ Note:</strong> Click 'View' links to go to the ReserveCalifornia booking page. You'll need to manually select the dates shown below, as direct booking links are not supported.</div><hr>{$sections}";
+        $disableLink = $disableUrl ? "<a href='" . htmlspecialchars($disableUrl) . "' style='color: #dc2626; text-decoration: none;'>Disable all alerts</a>" : "Disable all alerts";
+        return "<p><strong>Weekend availability found!</strong></p><p style='font-size: 12px; color: #6b7280; margin: 0 0 12px 0;'>Don't want to receive these alerts? {$disableLink}</p><p>Park: <strong>{$park}</strong></p><div style='background: #eef2ff; border-left: 4px solid #4c51bf; padding: 12px; margin: 12px 0;'><strong>ℹ️ Note:</strong> Click 'View' links to go to the ReserveCalifornia booking page. You'll need to manually select the dates shown below, as direct booking links are not supported.</div><hr>{$sections}<div style='margin-top: 20px; padding-top: 16px; border-top: 1px solid #e5e7eb; text-align: center;'><p style='font-size: 12px; color: #6b7280; margin: 0;'>Don't want to receive these alerts? {$disableLink}</p></div>";
     }
 
-    public static function alertText(string $parkName, string $dateRange, array $sites, array $favoriteSiteIds = []): string
+    public static function alertText(string $parkName, string $dateRange, array $sites, array $favoriteSiteIds = [], string $disableUrl = ''): string
     {
         $lines = [
             "Weekend availability found!",
-            "Park: {$parkName}",
-            ''
         ];
+        
+        if ($disableUrl) {
+            $lines[] = "Don't want to receive these alerts? Disable all alerts: {$disableUrl}";
+        }
+        
+        $lines[] = "Park: {$parkName}";
+        $lines[] = '';
         
         // Group sites by weekend date
         $byWeekend = [];
@@ -246,6 +252,11 @@ class EmailTemplates
             }
             
             $lines[] = '';
+        }
+        
+        if ($disableUrl) {
+            $lines[] = '';
+            $lines[] = "Don't want to receive these alerts? Disable all alerts: {$disableUrl}";
         }
         
         return implode("\n", $lines);

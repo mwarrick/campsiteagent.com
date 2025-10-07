@@ -632,7 +632,7 @@ if ($method === 'POST' && $uri === '/api/admin/notifications/daily-test') {
         $favoriteSiteIds = $favRepo->listFavoriteSiteIds($uid);
 
         $notify = new \CampsiteAgent\Services\NotificationService();
-        $ok = $notify->sendAvailabilityAlert($to, 'Daily Digest', $dateRangeStr, $alertSites, $favoriteSiteIds);
+        $ok = $notify->sendAvailabilityAlert($to, 'Daily Digest', $dateRangeStr, $alertSites, $favoriteSiteIds, $userId);
 
         json(200, ['sent' => $ok, 'to' => $to, 'sites' => count($alertSites), 'dateRange' => $dateRangeStr]);
     } catch (\Throwable $e) {
@@ -766,7 +766,7 @@ if ($method === 'POST' && $uri === '/api/admin/notifications/scrape-results') {
 
         $notify = new \CampsiteAgent\Services\NotificationService();
         $subject = 'Scrape Results - ' . count($alertSites) . ' sites found';
-        $ok = $notify->sendAvailabilityAlert($to, $subject, $dateRangeStr, $alertSites, $favoriteSiteIds);
+        $ok = $notify->sendAvailabilityAlert($to, $subject, $dateRangeStr, $alertSites, $favoriteSiteIds, $userId);
 
         json(200, ['sent' => $ok, 'to' => $to, 'sites' => count($alertSites), 'dateRange' => $dateRangeStr]);
     } catch (\Throwable $e) {
@@ -907,7 +907,7 @@ if ($method === 'POST' && $uri === '/api/admin/notifications/daily-run') {
             $dateRangeStr = date('n/j', strtotime($earliest)) . '-' . date('n/j/Y', strtotime($latest));
 
             $favoriteSiteIds = $favRepo->listFavoriteSiteIds($userId);
-            $ok = $notify->sendAvailabilityAlert($user['email'], 'Daily Digest', $dateRangeStr, $userAlertSites, $favoriteSiteIds);
+            $ok = $notify->sendAvailabilityAlert($user['email'], 'Daily Digest', $dateRangeStr, $userAlertSites, $favoriteSiteIds, $user['id']);
             if ($ok) { $sent++; $details[] = ['email' => $user['email'], 'sites' => count($userAlertSites)]; }
             else { $failed++; }
         }
@@ -1328,6 +1328,193 @@ if ($method === 'POST' && preg_match('#^/api/admin/users/(\d+)/names$#', $uri, $
         json(200, ['message' => 'User names updated']);
     } else {
         json(404, ['error' => 'User not found']);
+    }
+}
+
+// User: Send personal digest email
+if ($method === 'POST' && $uri === '/api/user/send-digest') {
+    header('Content-Type: application/json');
+    $userId = requireAuth();
+    
+    try {
+        $pdo = Database::getConnection();
+        $notify = new \CampsiteAgent\Services\NotificationService();
+        $favRepo = new \CampsiteAgent\Repositories\UserFavoritesRepository();
+        
+        // Get user info
+        $stmt = $pdo->prepare('SELECT id, email, first_name FROM users WHERE id = :id');
+        $stmt->execute([':id' => $userId]);
+        $user = $stmt->fetch();
+        
+        if (!$user) {
+            json(404, ['error' => 'User not found']);
+        }
+        
+        // Load user's enabled preferences
+        $st = $pdo->prepare('SELECT * FROM user_alert_preferences WHERE user_id = :uid AND enabled = 1');
+        $st->execute([':uid' => $userId]);
+        $prefs = $st->fetchAll();
+        
+        if (empty($prefs)) {
+            json(400, ['error' => 'No enabled alert preferences found. Please set up your preferences first.']);
+        }
+        
+        $userAlertSites = [];
+        $allFridays = [];
+        
+        foreach ($prefs as $pref) {
+            $parkFilterSql = '';
+            $params = [];
+            if (!empty($pref['park_id'])) {
+                $parkFilterSql = ' AND p.id = :parkId';
+                $params[':parkId'] = (int)$pref['park_id'];
+            }
+            
+            // Get current availability from database
+            $sql = 'SELECT p.id AS park_id, p.name AS park_name, p.park_number,
+                           s.id AS site_id, s.site_number, s.site_name, s.site_type,
+                           f.name AS facility_name, a.date
+                    FROM parks p
+                    JOIN sites s ON s.park_id = p.id
+                    LEFT JOIN facilities f ON s.facility_id = f.id
+                    JOIN site_availability a ON a.site_id = s.id
+                    WHERE a.is_available = 1 AND a.date >= CURDATE()' . $parkFilterSql . '
+                    ORDER BY p.name, a.date ASC, s.site_number ASC';
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll();
+            
+            // Group by park/site
+            $byPark = [];
+            $parkNumberByName = [];
+            foreach ($rows as $r) {
+                $parkName = $r['park_name'];
+                if (!isset($parkNumberByName[$parkName]) && !empty($r['park_number'])) {
+                    $parkNumberByName[$parkName] = $r['park_number'];
+                }
+                $key = $r['site_number'] . '|' . ($r['site_name'] ?? '') . '|' . ($r['site_type'] ?? '');
+                if (!isset($byPark[$parkName])) { $byPark[$parkName] = []; }
+                if (!isset($byPark[$parkName][$key])) {
+                    $byPark[$parkName][$key] = [
+                        'site_id' => (int)$r['site_id'],
+                        'site_number' => $r['site_number'],
+                        'site_name' => $r['site_name'],
+                        'site_type' => $r['site_type'],
+                        'facility_name' => $r['facility_name'],
+                        'dates' => []
+                    ];
+                }
+                $byPark[$parkName][$key]['dates'][] = $r['date'];
+            }
+            
+            $startDate = $pref['start_date'] ?? null;
+            $endDate = $pref['end_date'] ?? null;
+            $weekendOnlyPref = isset($pref['weekend_only']) ? ((int)$pref['weekend_only'] === 1) : true;
+            
+            foreach ($byPark as $parkName => $sites) {
+                foreach ($sites as $s) {
+                    $dateSet = array_fill_keys($s['dates'], true);
+                    $weekendDates = [];
+                    if ($weekendOnlyPref) {
+                        foreach ($s['dates'] as $d) {
+                            $ts = strtotime($d);
+                            if ((int)date('w', $ts) === 5) { // Friday
+                                $fri = date('Y-m-d', $ts);
+                                $sat = date('Y-m-d', $ts + 86400);
+                                if (isset($dateSet[$sat])) {
+                                    if ($startDate && $fri < $startDate) continue;
+                                    if ($endDate && $fri > $endDate) continue;
+                                    $weekendDates[] = ['fri' => $fri, 'sat' => $sat];
+                                    $allFridays[] = $fri;
+                                }
+                            }
+                        }
+                    } else {
+                        // Non-weekend mode: include individual available dates within window
+                        foreach ($s['dates'] as $d) {
+                            if ($startDate && $d < $startDate) continue;
+                            if ($endDate && $d > $endDate) continue;
+                            $fri = $d; $sat = date('Y-m-d', strtotime($d) + 86400);
+                            $weekendDates[] = ['fri' => $fri, 'sat' => $sat];
+                            $allFridays[] = $fri;
+                        }
+                    }
+                    
+                    if (!empty($weekendDates)) {
+                        $userAlertSites[] = [
+                            'site_id' => $s['site_id'],
+                            'site_number' => $s['site_number'],
+                            'site_name' => $s['site_name'] ?? '',
+                            'site_type' => $s['site_type'] ?? '',
+                            'facility_name' => $s['facility_name'] ?? '',
+                            'park_name' => $parkName,
+                            'park_number' => $parkNumberByName[$parkName] ?? null,
+                            'weekend_dates' => $weekendDates
+                        ];
+                    }
+                }
+            }
+        }
+        
+        if (empty($userAlertSites)) {
+            json(200, ['sent' => false, 'message' => 'No matching availability found for your preferences.']);
+        }
+        
+        $earliest = !empty($allFridays) ? min($allFridays) : date('Y-m-d');
+        $latest = !empty($allFridays) ? max($allFridays) : date('Y-m-d');
+        $dateRangeStr = date('n/j', strtotime($earliest)) . '-' . date('n/j/Y', strtotime($latest));
+        
+        $favoriteSiteIds = $favRepo->listFavoriteSiteIds($userId);
+        $ok = $notify->sendAvailabilityAlert($user['email'], 'Personal Digest', $dateRangeStr, $userAlertSites, $favoriteSiteIds, $userId);
+        
+        if ($ok) {
+            json(200, ['sent' => true, 'message' => 'Digest sent successfully', 'sites' => count($userAlertSites), 'dateRange' => $dateRangeStr]);
+        } else {
+            json(500, ['error' => 'Failed to send digest email']);
+        }
+        
+    } catch (\Throwable $e) {
+        json(500, ['error' => 'Error sending digest: ' . $e->getMessage()]);
+    }
+}
+
+// User: Disable all alerts (via email link)
+if ($method === 'GET' && preg_match('#^/api/user/disable-alerts/([^/]+)$#', $uri, $matches)) {
+    header('Content-Type: text/html; charset=utf-8');
+    
+    $token = $matches[1];
+    
+    try {
+        $pdo = Database::getConnection();
+        
+        // Verify token and get user
+        $stmt = $pdo->prepare('SELECT u.id, u.email, u.first_name FROM users u JOIN login_tokens lt ON u.id = lt.user_id WHERE lt.token = :token AND lt.expires_at > NOW()');
+        $stmt->execute([':token' => $token]);
+        $user = $stmt->fetch();
+        
+        if (!$user) {
+            echo '<html><body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;"><h2>❌ Invalid or expired link</h2><p>This link is invalid or has expired.</p><p><a href="/landing.html">Return to Campsite Agent</a></p></body></html>';
+            exit;
+        }
+        
+        // Disable all user's alert preferences
+        $stmt = $pdo->prepare('UPDATE user_alert_preferences SET enabled = 0 WHERE user_id = :userId');
+        $stmt->execute([':userId' => $user['id']]);
+        
+        $affectedRows = $stmt->rowCount();
+        
+        // Clean up the token
+        $stmt = $pdo->prepare('DELETE FROM login_tokens WHERE token = :token');
+        $stmt->execute([':token' => $token]);
+        
+        $name = $user['first_name'] ? htmlspecialchars($user['first_name']) : 'there';
+        
+        echo '<html><body style="font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f8fafc;"><div style="max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"><h2 style="color: #059669;">✅ Alerts Disabled</h2><p>Hi ' . $name . ',</p><p>All your alert preferences have been disabled. You will no longer receive daily digest emails.</p><p><strong>' . $affectedRows . ' alert preferences</strong> were disabled.</p><p>You can re-enable alerts anytime by logging in to your <a href="/dashboard.html" style="color: #2563eb;">dashboard</a>.</p><p style="margin-top: 30px; font-size: 14px; color: #6b7280;"><a href="/landing.html">Return to Campsite Agent</a></p></div></body></html>';
+        exit;
+        
+    } catch (\Throwable $e) {
+        echo '<html><body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;"><h2>❌ Error</h2><p>An error occurred while disabling alerts: ' . htmlspecialchars($e->getMessage()) . '</p><p><a href="/landing.html">Return to Campsite Agent</a></p></body></html>';
+        exit;
     }
 }
 

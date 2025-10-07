@@ -1,6 +1,6 @@
 # CampsiteAgent.com
 
-**Version 2.1** - October 2025
+**Version 2.2** - December 2025
 
 Automated monitoring system for California State Park campground availability, focusing on weekend availability at popular Southern California parks.
 
@@ -10,12 +10,16 @@ CampsiteAgent.com is a web application that automatically monitors ReserveCalifo
 
 ## ✨ Features
 
-### ✅ Core Functionality (v2.1)
+### ✅ Core Functionality (v2.2)
 
 - **🔐 User Authentication**: Email-based registration and passwordless login via Gmail API
 - **🌐 Real API Integration**: Direct integration with UseDirect API (ReserveCalifornia backend)
 - **📅 Weekend Detection**: Accurately identifies sites with Friday AND Saturday night availability
-- **📧 Email Notifications**: HTML/text emails grouped by weekend with facility details
+- **📧 Daily Email Notifications**: 
+  - HTML/text emails grouped by weekend with facility details
+  - Personalized digests based on user alert preferences
+  - "Email Digest Now" button for on-demand notifications
+  - "Disable All Alerts" links for easy opt-out
 - **📊 Interactive Dashboard**: 
   - Weekend-grouped view with facility breakdown
   - Date range filters (30/60/90/180 days)
@@ -35,6 +39,7 @@ CampsiteAgent.com is a web application that automatically monitors ReserveCalifo
 - **👥 User Preferences**: Customizable alert preferences per user
 - **🔧 Admin Scraping Interface**: Dedicated admin interface for data collection
 - **⏰ Daily Automated Scraping**: Automated daily scraping with CLI script and cron job support
+- **📧 Email Digest System**: Separate CLI script for sending daily digest emails to all users
 - **📱 Mobile Responsive**: Optimized for mobile devices (390px+ width)
 
 ### 🚀 Technical Features
@@ -229,6 +234,8 @@ Access the application at `http://127.0.0.1:8080`
 - `POST /api/admin/notifications/daily-test` - Send test digest email (admin only)
 - `POST /api/admin/notifications/daily-run` - Send daily digest to all users
 - `POST /api/admin/notifications/scrape-results` - Send email with scrape results
+- `POST /api/user/send-digest` - Send personal digest email (user only)
+- `GET /api/user/disable-alerts/{token}` - Disable all user alerts via email link
 
 ## 🎯 Usage
 
@@ -267,14 +274,23 @@ The system includes CLI scripts for automated operations:
 # Email-only mode (no scraping, uses existing data)
 /usr/bin/php /var/www/campsite-agent/app/bin/check-now.php --dry-run
 
-# Daily automated scraping with optional email notifications
-/usr/bin/php /var/www/campsite-agent/app/bin/daily-scrape.php --notify
+# Daily automated scraping
+/usr/bin/php /var/www/campsite-agent/app/bin/daily-scrape.php --verbose
+
+# Send daily digest emails to all users
+/usr/bin/php /var/www/campsite-agent/app/bin/send-daily-digest.php --verbose
+
+# Test email digest (dry run)
+/usr/bin/php /var/www/campsite-agent/app/bin/send-daily-digest.php --dry-run --verbose
 ```
 
-**Cron Job Setup** (for daily automated emails):
+**Cron Job Setup** (recommended separate scraping and emailing):
 ```bash
-# Add to crontab (runs daily at 6 AM)
-0 6 * * * /usr/bin/php /var/www/campsite-agent/app/bin/check-now.php --dry-run
+# Daily scraping at 5:00 AM
+0 5 * * * php /var/www/campsite-agent/app/bin/daily-scrape.php --verbose >> /var/www/campsite-agent/logs/scrape.log 2>&1
+
+# Daily digest emails at 6:00 AM (1 hour after scraping)
+0 6 * * * php /var/www/campsite-agent/app/bin/send-daily-digest.php --verbose >> /var/www/campsite-agent/logs/digest.log 2>&1
 ```
 
 ### Maintenance Scripts

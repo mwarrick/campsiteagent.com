@@ -5,18 +5,21 @@ namespace CampsiteAgent\Services;
 use CampsiteAgent\Templates\EmailTemplates;
 use CampsiteAgent\Repositories\EmailLogRepository;
 use CampsiteAgent\Repositories\UserPreferencesRepository;
+use CampsiteAgent\Repositories\LoginTokenRepository;
 
 class NotificationService
 {
     private GmailApiService $gmail;
     private EmailLogRepository $logs;
     private UserPreferencesRepository $preferences;
+    private LoginTokenRepository $tokens;
 
     public function __construct()
     {
         $this->gmail = new GmailApiService();
         $this->logs = new EmailLogRepository();
         $this->preferences = new UserPreferencesRepository();
+        $this->tokens = new LoginTokenRepository();
     }
 
     public function sendVerification(string $toEmail, string $verifyUrl, string $firstName = ''): bool
@@ -35,11 +38,21 @@ class NotificationService
         return $this->sendAndLog($toEmail, $subject, $html, $text);
     }
 
-    public function sendAvailabilityAlert(string $toEmail, string $parkName, string $dateRange, array $sites, array $favoriteSiteIds = []): bool
+    public function sendAvailabilityAlert(string $toEmail, string $parkName, string $dateRange, array $sites, array $favoriteSiteIds = [], ?int $userId = null): bool
     {
         $subject = EmailTemplates::alertSubject($parkName, $dateRange);
-        $html = EmailTemplates::alertHtml($parkName, $dateRange, $sites, $favoriteSiteIds);
-        $text = EmailTemplates::alertText($parkName, $dateRange, $sites, $favoriteSiteIds);
+        
+        // Generate disable URL if user ID is provided
+        $disableUrl = '';
+        if ($userId) {
+            $token = $this->tokens->create($userId, 'disable_alerts', 24 * 60); // 24 hours TTL
+            $baseUrl = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
+            $disableUrl = "{$protocol}://{$baseUrl}/api/user/disable-alerts/{$token}";
+        }
+        
+        $html = EmailTemplates::alertHtml($parkName, $dateRange, $sites, $favoriteSiteIds, $disableUrl);
+        $text = EmailTemplates::alertText($parkName, $dateRange, $sites, $favoriteSiteIds, $disableUrl);
         return $this->sendAndLog($toEmail, $subject, $html, $text);
     }
 
@@ -108,7 +121,9 @@ class NotificationService
                 $userData['email'],
                 $parkName,
                 $dateRangeStr,
-                $sites
+                $sites,
+                $userData['favorite_site_ids'] ?? [],
+                $userId
             );
             
             if ($success) {
