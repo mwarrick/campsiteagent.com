@@ -1,6 +1,6 @@
 # CampsiteAgent.com
 
-**Version 2.2** - December 2025
+**Version 2.2** - December 2025 (STABLE)
 
 Automated monitoring system for California State Park campground availability, focusing on weekend availability at popular Southern California parks.
 
@@ -11,6 +11,14 @@ CampsiteAgent.com is a web application that automatically monitors ReserveCalifo
 ## ✨ Features
 
 ### ✅ Core Functionality (v2.2)
+
+**🆕 New in v2.2:**
+- **"Disable All Alerts" links** in digest emails for easy opt-out
+- **"Email Digest Now" button** on user dashboard for on-demand emails
+- **Separate scraping and emailing** processes for better reliability
+- **Comprehensive test scripts** for debugging and validation
+- **Enhanced email templates** with dual disable links
+- **Fixed database status issues** in daily scraping
 
 - **🔐 User Authentication**: Email-based registration and passwordless login via Gmail API
 - **🌐 Real API Integration**: Direct integration with UseDirect API (ReserveCalifornia backend)
@@ -40,6 +48,7 @@ CampsiteAgent.com is a web application that automatically monitors ReserveCalifo
 - **🔧 Admin Scraping Interface**: Dedicated admin interface for data collection
 - **⏰ Daily Automated Scraping**: Automated daily scraping with CLI script and cron job support
 - **📧 Email Digest System**: Separate CLI script for sending daily digest emails to all users
+- **🔧 Test Scripts**: Comprehensive testing tools for scraping and email functionality
 - **📱 Mobile Responsive**: Optimized for mobile devices (390px+ width)
 
 ### 🚀 Technical Features
@@ -282,6 +291,15 @@ The system includes CLI scripts for automated operations:
 
 # Test email digest (dry run)
 /usr/bin/php /var/www/campsite-agent/app/bin/send-daily-digest.php --dry-run --verbose
+
+# Test scraping functionality (limited scope)
+/usr/bin/php /var/www/campsite-agent/app/bin/test-daily-scrape.php --parks=1,2 --months=1 --verbose
+
+# Test scraping with emails
+/usr/bin/php /var/www/campsite-agent/app/bin/test-daily-scrape.php --parks=1,2 --months=1 --send-emails --verbose
+
+# Test Gmail API configuration
+/usr/bin/php /var/www/campsite-agent/app/bin/test-gmail-config.php
 ```
 
 **Cron Job Setup** (recommended separate scraping and emailing):
