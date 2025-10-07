@@ -129,11 +129,16 @@ try {
         $log($message, $type);
     };
     
-    // Start scraping
+    // Start scraping - only scrape the specific parks we want to test
     $log("Starting TEST scraping process...", 'info');
     $startTime = microtime(true);
     
-    $results = $scraper->checkNow($progressCallback, $monthsToScrape, null);
+    $results = [];
+    foreach ($parks as $park) {
+        $log("Testing park: {$park['name']} (ID: {$park['id']})", 'info');
+        $parkResults = $scraper->checkNow($progressCallback, $monthsToScrape, $park['id']);
+        $results = array_merge($results, $parkResults);
+    }
     
     $endTime = microtime(true);
     $duration = round($endTime - $startTime, 2);
