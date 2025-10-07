@@ -8,6 +8,7 @@
  * Options:
  *   --parks=1,2,3  Comma-separated list of park IDs (default: first 2 active parks)
  *   --months=1     Number of months to scrape (default: 1)
+ *   --send-emails  Enable email notifications (default: disabled for testing)
  *   --verbose      Show detailed output
  */
 
@@ -21,6 +22,7 @@ use CampsiteAgent\Repositories\RunRepository;
 $options = getopt('', [
     'parks::',
     'months::',
+    'send-emails',
     'verbose',
     'help'
 ]);
@@ -31,6 +33,7 @@ if (isset($options['help'])) {
     echo "Options:\n";
     echo "  --parks=1,2,3     Comma-separated list of park IDs (default: first 2 active parks)\n";
     echo "  --months=1        Number of months to scrape (default: 1)\n";
+    echo "  --send-emails     Enable email notifications (default: disabled for testing)\n";
     echo "  --verbose         Show detailed output\n";
     echo "  --help            Show this help message\n";
     exit(0);
@@ -39,6 +42,7 @@ if (isset($options['help'])) {
 // Configuration - limited scope for testing
 $monthsToScrape = isset($options['months']) ? (int)$options['months'] : 1;
 $parkIds = isset($options['parks']) ? array_map('intval', explode(',', $options['parks'])) : null;
+$sendEmails = isset($options['send-emails']);
 $verbose = isset($options['verbose']);
 
 // Logging function
@@ -61,13 +65,13 @@ $log = function($message, $type = 'info') use ($verbose) {
 };
 
 $log("🧪 Starting TEST daily scraping (limited scope)...", 'info');
-$log("Configuration: months=$monthsToScrape", 'info');
+$log("Configuration: months=$monthsToScrape, send-emails=" . ($sendEmails ? 'yes' : 'no'), 'info');
 
 try {
     // Initialize services
     $parkRepo = new ParkRepository();
     $runRepo = new RunRepository();
-    $scraper = new ScraperService(false); // Disable notifications for test runs
+    $scraper = new ScraperService($sendEmails); // Enable/disable notifications based on flag
     
     // Get parks to scrape (limited for testing)
     if ($parkIds) {
