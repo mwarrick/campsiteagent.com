@@ -1,6 +1,6 @@
 # CampsiteAgent.com
 
-**Version 2.3** - January 2025 (STABLE)
+**Version 2.3** - October 2025 (STABLE)
 
 Automated monitoring system for California State Park campground availability, focusing on weekend availability at popular Southern California parks.
 
@@ -466,13 +466,13 @@ This is a personal project shared for educational purposes only.
 
 ## 📋 Changelog
 
-### Version 2.3.0 (January 2025)
+### Version 2.3.0 (October 2025)
 - **🔗 Park Website Links**: Added clickable links to official government park websites in dashboard
 - **🏞️ Enhanced Parks Management**: Complete admin interface for managing park website URLs
 - **🔧 Admin Tools**: URL validation, testing, and bulk management capabilities
 - **📱 Mobile Responsive**: Optimized admin interface for mobile devices
 
-### Version 2.2.0 (January 2025)
+### Version 2.2.0 (October 2025)
 - **"Disable All Alerts" links** in digest emails for easy opt-out
 - **"Email Digest Now" button** on user dashboard for on-demand emails
 - **Separate scraping and emailing** processes for better reliability
