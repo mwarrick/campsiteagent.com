@@ -375,7 +375,35 @@ if ($method === 'GET' && $uri === '/api/availability/latest') {
     
     // Apply pagination to sites
     $totalSites = count($allSites);
-    $paginatedSites = array_slice($allSites, $offset, $pageSize);
+    
+    // For "All parks" queries, ensure we get a good distribution across parks
+    if (!$parkId && count($byPark) > 1) {
+        // Calculate sites per park to ensure fair distribution
+        $sitesPerPark = max(1, floor($pageSize / count($byPark)));
+        $paginatedSites = [];
+        $currentOffset = $offset;
+        
+        // Distribute pagination across parks
+        foreach ($byPark as $park => $sites) {
+            $parkSites = [];
+            foreach ($sites as $site) {
+                $parkSites[] = ['park' => $park, 'site' => $site];
+            }
+            
+            if ($currentOffset > 0) {
+                $skip = min($currentOffset, count($parkSites));
+                $parkSites = array_slice($parkSites, $skip);
+                $currentOffset -= $skip;
+            }
+            
+            $take = min($sitesPerPark, count($parkSites), $pageSize - count($paginatedSites));
+            $paginatedSites = array_merge($paginatedSites, array_slice($parkSites, 0, $take));
+            
+            if (count($paginatedSites) >= $pageSize) break;
+        }
+    } else {
+        $paginatedSites = array_slice($allSites, $offset, $pageSize);
+    }
     
     // Group back by park for output
     $out = [];
