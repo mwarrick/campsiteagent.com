@@ -475,8 +475,12 @@ if ($method === 'GET' && $uri === '/api/check-now') {
         $monthsToScrape = 3;
     } elseif ($dateRangeParam === '90') {
         $monthsToScrape = 4;
+    } elseif ($dateRangeParam === '120') {
+        $monthsToScrape = 5;
     } elseif ($dateRangeParam === '180') {
         $monthsToScrape = 6;
+    } elseif ($dateRangeParam === '365') {
+        $monthsToScrape = 12;
     }
     
     // Build filter message
