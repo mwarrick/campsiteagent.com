@@ -264,18 +264,15 @@ if ($method === 'GET' && $uri === '/api/availability/latest') {
     $page = max(1, (int)($_GET['page'] ?? 1));
     $pageSize = min(100, max(10, (int)($_GET['pageSize'] ?? 20)));
     $offset = ($page - 1) * $pageSize;
-    $sortBy = in_array(($_GET['sortBy'] ?? 'date'), ['date','site'], true) ? $_GET['sortBy'] : 'date';
-    $sortDir = (($_GET['sortDir'] ?? 'asc') === 'desc') ? 'DESC' : 'ASC';
+    // Use default sorting since sort controls were removed from frontend
+    $sortBy = 'date';
+    $sortDir = 'ASC';
 
     // For "All parks" queries, use park ID ordering to ensure fair distribution across parks
     if (!$parkId) {
-        $order = $sortBy === 'site'
-            ? ' ORDER BY p.id, s.site_number ' . $sortDir . ', a.date ' . $sortDir
-            : ' ORDER BY p.id, a.date ' . $sortDir . ', s.site_number ' . $sortDir;
+        $order = ' ORDER BY p.id, a.date ASC, s.site_number ASC';
     } else {
-        $order = $sortBy === 'site'
-            ? ' ORDER BY p.name, s.site_number ' . $sortDir . ', a.date ' . $sortDir
-            : ' ORDER BY p.name, a.date ' . $sortDir . ', s.site_number ' . $sortDir;
+        $order = ' ORDER BY p.name, a.date ASC, s.site_number ASC';
     }
 
     $wherePark = $parkId ? ' AND p.id = :parkId' : '';

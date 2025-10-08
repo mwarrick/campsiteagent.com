@@ -228,20 +228,6 @@
         </select>
       </label>
       <label>
-        Sort by:
-        <select id="sortBy">
-          <option value="date">Date</option>
-          <option value="site">Site</option>
-        </select>
-      </label>
-      <label>
-        Direction:
-        <select id="sortDir">
-          <option value="asc">Ascending</option>
-          <option value="desc">Descending</option>
-        </select>
-      </label>
-      <label>
         <input type="checkbox" id="favoritesOnly" /> Favorites only
       </label>
       <button id="apply">Apply</button>
@@ -327,7 +313,7 @@
 
 
   <script>
-    let state = { parkId: '', weekendOnly: true, dateRange: '30', page: 1, pageSize: 9999, sortBy: 'date', sortDir: 'asc' };
+    let state = { parkId: '', weekendOnly: true, dateRange: '30', page: 1, pageSize: 9999 };
     let favoriteSiteIds = new Set();
 
     let allParks = [];
@@ -496,11 +482,7 @@
       if (state.dateRange && state.dateRange !== 'all') q.set('dateRange', state.dateRange);
       q.set('page', String(state.page));
       q.set('pageSize', String(state.pageSize));
-      q.set('sortBy', state.sortBy);
-      q.set('sortDir', state.sortDir);
-      const queryString = q.toString();
-      console.log('API Query:', queryString);
-      return queryString;
+      return q.toString();
     }
 
     function hasWeekend(dates) {
@@ -542,12 +524,6 @@
       const dateRangeText = dateRangeSelect.options[dateRangeSelect.selectedIndex].text;
       filters.push(`<strong>Date Range:</strong> ${dateRangeText}`);
       
-      // Sort
-      const sortBySelect = document.getElementById('sortBy');
-      const sortDirSelect = document.getElementById('sortDir');
-      const sortByText = sortBySelect.options[sortBySelect.selectedIndex].text;
-      const sortDirText = sortDirSelect.options[sortDirSelect.selectedIndex].text;
-      filters.push(`<strong>Sort:</strong> ${sortByText} (${sortDirText})`);
       
       const filterSummary = filters.join(' | ');
       
@@ -732,30 +708,10 @@
       state.parkId = document.getElementById('park').value;
       state.weekendOnly = document.getElementById('weekendOnly').checked;
       state.dateRange = document.getElementById('dateRange').value;
-      state.sortBy = document.getElementById('sortBy').value;
-      state.sortDir = document.getElementById('sortDir').value;
       state.page = 1;
       loadData();
     });
 
-    // Add event listeners for sort controls to trigger immediately
-    document.getElementById('sortBy').addEventListener('change', () => {
-      state.sortBy = document.getElementById('sortBy').value;
-      console.log('Sort By changed to:', state.sortBy);
-      state.page = 1;
-      loadData();
-    });
-
-    document.getElementById('sortDir').addEventListener('change', () => {
-      state.sortDir = document.getElementById('sortDir').value;
-      console.log('Sort Dir changed to:', state.sortDir);
-      state.page = 1;
-      loadData();
-    });
-
-    // Initialize sort controls with current state values
-    document.getElementById('sortBy').value = state.sortBy;
-    document.getElementById('sortDir').value = state.sortDir;
 
     // Also reapply immediately when toggling Favorites only (for responsiveness)
     document.getElementById('favoritesOnly').addEventListener('change', () => {
