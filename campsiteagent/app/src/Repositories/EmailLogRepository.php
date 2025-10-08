@@ -33,7 +33,7 @@ class EmailLogRepository
 
     /**
      * Returns true if a Daily Digest was already sent to this email today.
-     * We detect digest by subject suffix ": Daily Digest" and sent_at date is today.
+     * We detect digest by subject containing "Daily Digest" and sent_at date is today.
      */
     public function hasSentDailyDigestToday(string $userEmail): bool
     {
@@ -47,7 +47,7 @@ class EmailLogRepository
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
             ':email' => $userEmail,
-            ':subjectLike' => '%: Daily Digest'
+            ':subjectLike' => '%Daily Digest%'
         ]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return isset($row['cnt']) && (int)$row['cnt'] > 0;
