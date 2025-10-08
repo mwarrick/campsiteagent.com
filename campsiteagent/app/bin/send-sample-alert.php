@@ -24,7 +24,7 @@ $sites = [
 ];
 
 try {
-    $ok = $service->sendAvailabilityAlert($recipient, $park, $range, $sites);
+    $ok = $service->sendAvailabilityAlert($recipient, $park, $range, $sites, [], null, 'https://www.parks.ca.gov/?page_id=645');
     if ($ok) {
         echo "Sample alert sent to {$recipient}\n";
         exit(0);

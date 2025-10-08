@@ -124,7 +124,7 @@ try {
     
     // Send test email
     $log("Sending test email...", 'info');
-    $success = $notify->sendAvailabilityAlert($toEmail, $parkName, $dateRange, $fakeSites);
+    $success = $notify->sendAvailabilityAlert($toEmail, $parkName, $dateRange, $fakeSites, [], null, 'https://www.parks.ca.gov/?page_id=123');
     
     if ($success) {
         $log("✅ Test email sent successfully!", 'success');

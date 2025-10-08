@@ -217,7 +217,7 @@ class ScraperService
                             $dateRangeStr = "{$start}-{$end}";
                         }
                         
-                        $this->notify->sendAvailabilityAlert($sample, $park['name'], $dateRangeStr, $alertSites);
+                        $this->notify->sendAvailabilityAlert($sample, $park['name'], $dateRangeStr, $alertSites, [], null, 'https://www.parks.ca.gov/?page_id=123');
                     }
                 }
 

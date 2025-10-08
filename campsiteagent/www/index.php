@@ -286,7 +286,7 @@ if ($method === 'GET' && $uri === '/api/availability/latest') {
     }
 
     // Don't LIMIT the raw query - we need all dates for each site to detect weekends
-    $sql = 'SELECT p.id AS park_id, p.name AS park_name, p.park_number, s.id AS site_id, s.site_number, s.site_name, s.site_type, 
+    $sql = 'SELECT p.id AS park_id, p.name AS park_name, p.park_number, p.website_url, s.id AS site_id, s.site_number, s.site_name, s.site_type, 
                    f.id AS facility_id, f.name AS facility_name, a.date, a.created_at AS found_at
             FROM parks p
             JOIN sites s ON s.park_id = p.id
@@ -308,7 +308,7 @@ if ($method === 'GET' && $uri === '/api/availability/latest') {
         
         // Store park info for later
         if (!isset($parkInfo[$park])) {
-            $parkInfo[$park] = ['id' => $parkId, 'park_number' => $parkNumber];
+            $parkInfo[$park] = ['id' => $parkId, 'park_number' => $parkNumber, 'website_url' => $r['website_url']];
         }
         
         // Use site_number + site_name as unique key (in case same number in different facilities)
@@ -387,6 +387,7 @@ if ($method === 'GET' && $uri === '/api/availability/latest') {
                 'park' => $park, 
                 'park_id' => $parkInfo[$park]['id'] ?? null,
                 'park_number' => $parkInfo[$park]['park_number'] ?? null,
+                'website_url' => $parkInfo[$park]['website_url'] ?? null,
                 'sites' => [$item['site']]
             ];
         }
@@ -631,8 +632,17 @@ if ($method === 'POST' && $uri === '/api/admin/notifications/daily-test') {
         $favRepo = new \CampsiteAgent\Repositories\UserFavoritesRepository();
         $favoriteSiteIds = $favRepo->listFavoriteSiteIds($uid);
 
+        // Get park website URL for the first park in the results
+        $parkWebsiteUrl = null;
+        if (!empty($alertSites)) {
+            $firstParkName = $alertSites[0]['park_name'];
+            $stmt = $pdo->prepare('SELECT website_url FROM parks WHERE name = :name LIMIT 1');
+            $stmt->execute([':name' => $firstParkName]);
+            $parkWebsiteUrl = $stmt->fetchColumn();
+        }
+
         $notify = new \CampsiteAgent\Services\NotificationService();
-        $ok = $notify->sendAvailabilityAlert($to, 'Daily Digest', $dateRangeStr, $alertSites, $favoriteSiteIds, $userId);
+        $ok = $notify->sendAvailabilityAlert($to, 'Daily Digest', $dateRangeStr, $alertSites, $favoriteSiteIds, $userId, $parkWebsiteUrl);
 
         json(200, ['sent' => $ok, 'to' => $to, 'sites' => count($alertSites), 'dateRange' => $dateRangeStr]);
     } catch (\Throwable $e) {
@@ -764,9 +774,18 @@ if ($method === 'POST' && $uri === '/api/admin/notifications/scrape-results') {
         $favRepo = new \CampsiteAgent\Repositories\UserFavoritesRepository();
         $favoriteSiteIds = $favRepo->listFavoriteSiteIds($uid);
 
+        // Get park website URL for the first park in the results
+        $parkWebsiteUrl = null;
+        if (!empty($alertSites)) {
+            $firstParkName = $alertSites[0]['park_name'];
+            $stmt = $pdo->prepare('SELECT website_url FROM parks WHERE name = :name LIMIT 1');
+            $stmt->execute([':name' => $firstParkName]);
+            $parkWebsiteUrl = $stmt->fetchColumn();
+        }
+
         $notify = new \CampsiteAgent\Services\NotificationService();
         $subject = 'Scrape Results - ' . count($alertSites) . ' sites found';
-        $ok = $notify->sendAvailabilityAlert($to, $subject, $dateRangeStr, $alertSites, $favoriteSiteIds, $userId);
+        $ok = $notify->sendAvailabilityAlert($to, $subject, $dateRangeStr, $alertSites, $favoriteSiteIds, $userId, $parkWebsiteUrl);
 
         json(200, ['sent' => $ok, 'to' => $to, 'sites' => count($alertSites), 'dateRange' => $dateRangeStr]);
     } catch (\Throwable $e) {
@@ -907,7 +926,17 @@ if ($method === 'POST' && $uri === '/api/admin/notifications/daily-run') {
             $dateRangeStr = date('n/j', strtotime($earliest)) . '-' . date('n/j/Y', strtotime($latest));
 
             $favoriteSiteIds = $favRepo->listFavoriteSiteIds($userId);
-            $ok = $notify->sendAvailabilityAlert($user['email'], 'Daily Digest', $dateRangeStr, $userAlertSites, $favoriteSiteIds, $user['id']);
+            
+            // Get park website URL for the first park in the results
+            $parkWebsiteUrl = null;
+            if (!empty($userAlertSites)) {
+                $firstParkName = $userAlertSites[0]['park_name'];
+                $stmt = $pdo->prepare('SELECT website_url FROM parks WHERE name = :name LIMIT 1');
+                $stmt->execute([':name' => $firstParkName]);
+                $parkWebsiteUrl = $stmt->fetchColumn();
+            }
+            
+            $ok = $notify->sendAvailabilityAlert($user['email'], 'Daily Digest', $dateRangeStr, $userAlertSites, $favoriteSiteIds, $user['id'], $parkWebsiteUrl);
             if ($ok) { $sent++; $details[] = ['email' => $user['email'], 'sites' => count($userAlertSites)]; }
             else { $failed++; }
         }
@@ -1331,6 +1360,112 @@ if ($method === 'POST' && preg_match('#^/api/admin/users/(\d+)/names$#', $uri, $
     }
 }
 
+// Admin: Update park website URL
+if ($method === 'PUT' && preg_match('#^/api/admin/parks/(\d+)/website-url$#', $uri, $matches)) {
+    header('Content-Type: application/json');
+    $uid = requireAuth();
+    requireAdmin($uid);
+    
+    $parkId = (int)$matches[1];
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+    $websiteUrl = $input['website_url'] ?? null;
+    
+    try {
+        $pdo = Database::getConnection();
+        
+        // Validate park exists
+        $stmt = $pdo->prepare('SELECT id FROM parks WHERE id = :id');
+        $stmt->execute([':id' => $parkId]);
+        if (!$stmt->fetch()) {
+            json(404, ['error' => 'Park not found']);
+        }
+        
+        // Update website URL
+        $stmt = $pdo->prepare('UPDATE parks SET website_url = :url WHERE id = :id');
+        $stmt->execute([
+            ':url' => $websiteUrl,
+            ':id' => $parkId
+        ]);
+        
+        json(200, [
+            'success' => true,
+            'message' => 'Park website URL updated successfully',
+            'park_id' => $parkId,
+            'website_url' => $websiteUrl
+        ]);
+        
+    } catch (\Throwable $e) {
+        json(500, ['error' => 'Failed to update park website URL: ' . $e->getMessage()]);
+    }
+}
+
+// Admin: Purge old site_availability data
+if ($method === 'POST' && $uri === '/api/admin/purge-old-data') {
+    header('Content-Type: application/json');
+    $uid = requireAuth();
+    requireAdmin($uid);
+    
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+    $days = max(1, (int)($input['days'] ?? 7));
+    
+    try {
+        $startTime = microtime(true);
+        $pdo = Database::getConnection();
+        
+        $cutoff = date('Y-m-d H:i:s', strtotime("-{$days} days"));
+        
+        // Count total candidates
+        $stmtCount = $pdo->prepare('SELECT COUNT(*) FROM site_availability WHERE created_at < :cutoff');
+        $stmtCount->execute([':cutoff' => $cutoff]);
+        $total = (int)$stmtCount->fetchColumn();
+        
+        if ($total === 0) {
+            json(200, [
+                'deleted' => 0,
+                'cutoff' => $cutoff,
+                'message' => 'No old records found to purge'
+            ]);
+        }
+        
+        // Delete in batches to avoid long locks
+        $batchSize = 5000;
+        $deleted = 0;
+        
+        while (true) {
+            // Collect a batch of IDs to delete
+            $stmtIds = $pdo->prepare('SELECT id FROM site_availability WHERE created_at < :cutoff ORDER BY id ASC LIMIT :lim');
+            $stmtIds->bindValue(':cutoff', $cutoff, PDO::PARAM_STR);
+            $stmtIds->bindValue(':lim', $batchSize, PDO::PARAM_INT);
+            $stmtIds->execute();
+            $ids = array_column($stmtIds->fetchAll(), 'id');
+            
+            if (empty($ids)) break;
+            
+            // Delete this batch
+            $in = implode(',', array_fill(0, count($ids), '?'));
+            $sqlDel = "DELETE FROM site_availability WHERE id IN ({$in})";
+            $stmtDel = $pdo->prepare($sqlDel);
+            $stmtDel->execute($ids);
+            $deleted += $stmtDel->rowCount();
+            
+            // Small pause to reduce lock pressure
+            usleep(100000); // 100ms
+        }
+        
+        $executionTime = round((microtime(true) - $startTime) * 1000, 2);
+        
+        json(200, [
+            'deleted' => $deleted,
+            'cutoff' => $cutoff,
+            'execution_time' => $executionTime . 'ms',
+            'message' => "Successfully purged {$deleted} old records"
+        ]);
+        
+    } catch (\Throwable $e) {
+        json(500, ['error' => 'Failed to purge old data: ' . $e->getMessage()]);
+    }
+}
+
 // User: Send personal digest email
 if ($method === 'POST' && $uri === '/api/user/send-digest') {
     header('Content-Type: application/json');
@@ -1465,7 +1600,17 @@ if ($method === 'POST' && $uri === '/api/user/send-digest') {
         $dateRangeStr = date('n/j', strtotime($earliest)) . '-' . date('n/j/Y', strtotime($latest));
         
         $favoriteSiteIds = $favRepo->listFavoriteSiteIds($userId);
-        $ok = $notify->sendAvailabilityAlert($user['email'], 'Personal Digest', $dateRangeStr, $userAlertSites, $favoriteSiteIds, $userId);
+        
+        // Get park website URL for the first park in the results
+        $parkWebsiteUrl = null;
+        if (!empty($userAlertSites)) {
+            $firstParkName = $userAlertSites[0]['park_name'];
+            $stmt = $pdo->prepare('SELECT website_url FROM parks WHERE name = :name LIMIT 1');
+            $stmt->execute([':name' => $firstParkName]);
+            $parkWebsiteUrl = $stmt->fetchColumn();
+        }
+        
+        $ok = $notify->sendAvailabilityAlert($user['email'], 'Personal Digest', $dateRangeStr, $userAlertSites, $favoriteSiteIds, $userId, $parkWebsiteUrl);
         
         if ($ok) {
             json(200, ['sent' => true, 'message' => 'Digest sent successfully', 'sites' => count($userAlertSites), 'dateRange' => $dateRangeStr]);

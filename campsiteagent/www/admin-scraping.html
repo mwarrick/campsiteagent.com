@@ -459,6 +459,22 @@
                 width: 100%;
                 justify-content: flex-start;
             }
+            
+            /* Parks management mobile styles */
+            .facility-row {
+                padding: 12px;
+            }
+            
+            .facility-row input[type="url"] {
+                font-size: 16px; /* Prevents zoom on iOS */
+                padding: 8px;
+                min-width: 200px;
+            }
+            
+            .facility-row button {
+                font-size: 12px;
+                padding: 8px 12px;
+            }
         }
         
         @media (max-width: 480px) {
@@ -564,6 +580,7 @@
                     <button id="manageFacilities" class="btn-success">⚙️ Manage Facilities</button>
                     <button id="manageParks" class="btn-secondary">🏞️ Manage Parks</button>
                     <button id="sendDailyDigest" class="btn-success">✉️ Send Test Digest</button>
+                    <button id="purgeOldData" class="btn-danger">🗑️ Purge Old Data</button>
                 </div>
             </div>
 
@@ -1042,6 +1059,56 @@
             // If you ever want to re-enable after some time, restore:
             // setTimeout(() => { btn.disabled = false; btn.textContent = prevText; }, 30000);
         });
+        
+        // Purge old data
+        document.getElementById('purgeOldData').addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            if (btn.disabled) return;
+            
+            const days = prompt('Enter number of days to keep (default: 7):', '7');
+            if (days === null) return; // User cancelled
+            
+            const daysNum = parseInt(days) || 7;
+            if (daysNum < 1) {
+                alert('Please enter a valid number of days (minimum 1)');
+                return;
+            }
+            
+            if (!confirm(`This will permanently delete all site_availability records older than ${daysNum} days. Continue?`)) {
+                return;
+            }
+            
+            btn.disabled = true;
+            const originalText = btn.textContent;
+            btn.textContent = '🔄 Purging...';
+            
+            try {
+                const res = await fetchWithAuth('/api/admin/purge-old-data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ days: daysNum })
+                });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    // Show results in a detailed popup
+                    const message = `✅ Purge completed successfully!\n\n` +
+                        `📊 Results:\n` +
+                        `• Deleted: ${data.deleted || 0} records\n` +
+                        `• Days kept: ${daysNum}\n` +
+                        `• Cutoff date: ${data.cutoff || 'N/A'}\n` +
+                        `• Execution time: ${data.execution_time || 'N/A'}`;
+                    alert(message);
+                } else {
+                    alert('❌ Error: ' + (data.error || 'Failed to purge old data'));
+                }
+            } catch (e) {
+                alert('❌ Error: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        });
         document.getElementById('closeFacilities').addEventListener('click', closeFacilitiesModal);
         document.getElementById('facilitiesModal').addEventListener('click', (e) => { if (e.target.id === 'facilitiesModal') closeFacilitiesModal(); });
         document.getElementById('facilitiesParkSelect').addEventListener('change', (e) => {
@@ -1085,21 +1152,141 @@
                 parks.forEach(p => {
                     const row = document.createElement('div');
                     row.className = 'facility-row';
-                    const left = document.createElement('div');
-                    left.innerHTML = `<div style=\"font-weight:600;\">${p.name}</div><div style=\"color:#718096; font-size:.85rem;\">ID: ${p.id} • Park # ${(p.park_number||p.external_id||'')} • ${p.active ? 'Active' : 'Inactive'}</div>`;
-                    const right = document.createElement('div');
+                    row.style.flexDirection = 'column';
+                    row.style.alignItems = 'flex-start';
+                    row.style.gap = '8px';
+                    
+                    // Park info section
+                    const parkInfo = document.createElement('div');
+                    parkInfo.style.width = '100%';
+                    parkInfo.innerHTML = `
+                        <div style="font-weight:600; margin-bottom:4px;">${p.name}</div>
+                        <div style="color:#718096; font-size:.85rem; margin-bottom:8px;">
+                            ID: ${p.id} • Park # ${(p.park_number||p.external_id||'')} • ${p.active ? 'Active' : 'Inactive'}
+                        </div>
+                    `;
+                    
+                    // Website URL section
+                    const urlSection = document.createElement('div');
+                    urlSection.style.width = '100%';
+                    urlSection.style.display = 'flex';
+                    urlSection.style.alignItems = 'center';
+                    urlSection.style.gap = '8px';
+                    urlSection.style.flexWrap = 'wrap';
+                    
+                    const urlLabel = document.createElement('label');
+                    urlLabel.textContent = 'Website URL:';
+                    urlLabel.style.fontWeight = '500';
+                    urlLabel.style.color = '#4a5568';
+                    urlLabel.style.minWidth = '100px';
+                    
+                    const urlInput = document.createElement('input');
+                    urlInput.type = 'url';
+                    urlInput.value = p.website_url || '';
+                    urlInput.placeholder = 'https://www.parks.ca.gov/?page_id=123';
+                    urlInput.style.flex = '1';
+                    urlInput.style.minWidth = '300px';
+                    urlInput.style.padding = '6px 8px';
+                    urlInput.style.border = '1px solid #e2e8f0';
+                    urlInput.style.borderRadius = '4px';
+                    urlInput.style.fontSize = '14px';
+                    
+                    const saveBtn = document.createElement('button');
+                    saveBtn.textContent = 'Save';
+                    saveBtn.className = 'btn-link';
+                    saveBtn.style.background = '#4c51bf';
+                    saveBtn.style.color = 'white';
+                    saveBtn.style.padding = '6px 12px';
+                    saveBtn.style.borderRadius = '4px';
+                    saveBtn.style.border = 'none';
+                    saveBtn.style.fontSize = '12px';
+                    saveBtn.style.fontWeight = '500';
+                    
+                    const testBtn = document.createElement('button');
+                    testBtn.textContent = 'Test';
+                    testBtn.className = 'btn-link';
+                    testBtn.style.background = '#059669';
+                    testBtn.style.color = 'white';
+                    testBtn.style.padding = '6px 12px';
+                    testBtn.style.borderRadius = '4px';
+                    testBtn.style.border = 'none';
+                    testBtn.style.fontSize = '12px';
+                    testBtn.style.fontWeight = '500';
+                    testBtn.style.marginLeft = '4px';
+                    
+                    // Actions section
+                    const actions = document.createElement('div');
+                    actions.style.width = '100%';
+                    actions.style.display = 'flex';
+                    actions.style.justifyContent = 'space-between';
+                    actions.style.alignItems = 'center';
+                    actions.style.marginTop = '8px';
+                    
                     const del = document.createElement('button');
                     del.className = 'btn-link';
                     del.style.color = '#e53e3e';
-                    del.textContent = 'Delete';
+                    del.textContent = 'Delete Park';
                     del.addEventListener('click', async () => {
                         if (!confirm('Delete this park? You must remove facilities/sites first.')) return;
                         const r = await fetch(`/api/admin/parks/${p.id}`, { method: 'DELETE', credentials: 'same-origin' });
                         if (r.ok) renderParksList(); else alert('Failed to delete park');
                     });
-                    right.appendChild(del);
-                    row.appendChild(left);
-                    row.appendChild(right);
+                    
+                    // Event listeners
+                    saveBtn.addEventListener('click', async () => {
+                        const newUrl = urlInput.value.trim();
+                        saveBtn.disabled = true;
+                        saveBtn.textContent = 'Saving...';
+                        
+                        try {
+                            const res = await fetch(`/api/admin/parks/${p.id}/website-url`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                credentials: 'same-origin',
+                                body: JSON.stringify({ website_url: newUrl || null })
+                            });
+                            
+                            if (res.ok) {
+                                saveBtn.textContent = 'Saved!';
+                                saveBtn.style.background = '#059669';
+                                setTimeout(() => {
+                                    saveBtn.textContent = 'Save';
+                                    saveBtn.style.background = '#4c51bf';
+                                    saveBtn.disabled = false;
+                                }, 2000);
+                            } else {
+                                const error = await res.json().catch(() => ({}));
+                                alert('Failed to save: ' + (error.error || 'Unknown error'));
+                                saveBtn.textContent = 'Save';
+                                saveBtn.disabled = false;
+                            }
+                        } catch (e) {
+                            alert('Error: ' + e.message);
+                            saveBtn.textContent = 'Save';
+                            saveBtn.disabled = false;
+                        }
+                    });
+                    
+                    testBtn.addEventListener('click', () => {
+                        const url = urlInput.value.trim();
+                        if (url) {
+                            window.open(url, '_blank');
+                        } else {
+                            alert('Please enter a URL first');
+                        }
+                    });
+                    
+                    // Assemble the row
+                    urlSection.appendChild(urlLabel);
+                    urlSection.appendChild(urlInput);
+                    urlSection.appendChild(saveBtn);
+                    urlSection.appendChild(testBtn);
+                    
+                    actions.appendChild(del);
+                    
+                    row.appendChild(parkInfo);
+                    row.appendChild(urlSection);
+                    row.appendChild(actions);
                     container.appendChild(row);
                 });
                 if (parks.length === 0) {

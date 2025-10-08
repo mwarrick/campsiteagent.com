@@ -1,6 +1,6 @@
 # CampsiteAgent.com
 
-**Version 2.2** - December 2025 (STABLE)
+**Version 2.3** - October 2024 (STABLE)
 
 Automated monitoring system for California State Park campground availability, focusing on weekend availability at popular Southern California parks.
 
@@ -10,9 +10,18 @@ CampsiteAgent.com is a web application that automatically monitors ReserveCalifo
 
 ## ✨ Features
 
-### ✅ Core Functionality (v2.2)
+### ✅ Core Functionality (v2.3)
 
-**🆕 New in v2.2:**
+**🆕 New in v2.3:**
+- **🔗 Park Website Links**: Clickable links to official government park websites
+  - Dashboard: Park names display with 🔗 symbol linking to official websites
+  - Emails: Park names are clickable links in both HTML and plain text emails
+  - Admin: Full management interface for editing and testing park website URLs
+- **🏞️ Enhanced Parks Management**: Complete CRUD interface for park website URLs
+- **📧 Improved Email Experience**: Direct links to official park information
+- **🔧 Admin Tools**: URL validation, testing, and bulk management capabilities
+
+**Previous Features (v2.2):**
 - **"Disable All Alerts" links** in digest emails for easy opt-out
 - **"Email Digest Now" button** on user dashboard for on-demand emails
 - **Separate scraping and emailing** processes for better reliability
@@ -138,6 +147,8 @@ campsiteagent/
    # New in v2.1
    mysql -u root -p your_database_name < migrations/014_add_updated_at_to_site_availability.sql
    mysql -u root -p your_database_name < migrations/015_create_user_favorites.sql
+   # New in v2.3
+   mysql -u root -p your_database_name < migrations/016_add_park_websites.sql
    ```
 
 4. **Configure environment variables**
@@ -245,6 +256,7 @@ Access the application at `http://127.0.0.1:8080`
 - `POST /api/admin/notifications/scrape-results` - Send email with scrape results
 - `POST /api/user/send-digest` - Send personal digest email (user only)
 - `GET /api/user/disable-alerts/{token}` - Disable all user alerts via email link
+- `PUT /api/admin/parks/{id}/website-url` - Update park website URL (admin only)
 
 ## 🎯 Usage
 
@@ -266,11 +278,12 @@ Access the application at `http://127.0.0.1:8080`
 
 1. **Access Admin Tools**: Login with an admin account
 2. **Manage Parks**: Activate/deactivate parks for monitoring
-3. **Sync Facilities**: Update facility data from ReserveCalifornia
-4. **Monitor Scraping**: Use the admin scraping interface for data collection
-5. **Email Testing**: Use "Send Test Digest" to test email notifications
-6. **Daily Notifications**: Set up cron job for automated daily email digests
-7. **Manage Users**: View user preferences and activity
+3. **Manage Park Websites**: Edit and test park website URLs in the parks management interface
+4. **Sync Facilities**: Update facility data from ReserveCalifornia
+5. **Monitor Scraping**: Use the admin scraping interface for data collection
+6. **Email Testing**: Use "Send Test Digest" to test email notifications
+7. **Daily Notifications**: Set up cron job for automated daily email digests
+8. **Manage Users**: View user preferences and activity
 
 ### Command Line Interface
 
@@ -300,6 +313,9 @@ The system includes CLI scripts for automated operations:
 
 # Test Gmail API configuration
 /usr/bin/php /var/www/campsite-agent/app/bin/test-gmail-config.php
+
+# Populate park website URLs (one-time setup)
+/usr/bin/php /var/www/campsite-agent/app/bin/scrape-park-websites.php --verbose
 ```
 
 **Cron Job Setup** (recommended separate scraping and emailing):
@@ -326,6 +342,27 @@ php fix-unknown-facilities.php
 ```
 
 This script addresses the common issue where sites have NULL facility_id, causing the dashboard to display "Unknown Facility" instead of actual facility names. Run this after scraping new parks or if you see "Unknown Facility" on the dashboard.
+
+### Park Website Management
+
+**Initial Setup:**
+```bash
+# Populate park website URLs (run once after migration)
+php scrape-park-websites.php --verbose
+```
+
+**Admin Interface:**
+- Access the admin scraping page and click "🏞️ Manage Parks"
+- Edit website URLs directly in the interface
+- Use "Test" buttons to verify URLs work
+- Save changes immediately to the database
+
+**Features:**
+- Inline editing of park website URLs
+- URL validation and testing
+- Visual feedback for successful saves
+- Mobile-responsive interface
+- Bulk management capabilities
 
 ## 🔧 Configuration
 
@@ -428,6 +465,23 @@ This software is provided "AS-IS" without any warranty or support. Use at your o
 - No response to issues or questions
 
 This is a personal project shared for educational purposes only.
+
+## 📋 Changelog
+
+### Version 2.3.0 (October 2024)
+- **🔗 Park Website Links**: Added clickable links to official government park websites
+- **🏞️ Enhanced Parks Management**: Complete admin interface for managing park website URLs
+- **📧 Improved Email Experience**: Park names are now clickable links in all email notifications
+- **🔧 Admin Tools**: URL validation, testing, and bulk management capabilities
+- **📱 Mobile Responsive**: Optimized admin interface for mobile devices
+
+### Version 2.2.0 (December 2025)
+- **"Disable All Alerts" links** in digest emails for easy opt-out
+- **"Email Digest Now" button** on user dashboard for on-demand emails
+- **Separate scraping and emailing** processes for better reliability
+- **Comprehensive test scripts** for debugging and validation
+- **Enhanced email templates** with dual disable links
+- **Fixed database status issues** in daily scraping
 
 ## 🎉 Acknowledgments
 

@@ -21,6 +21,7 @@ require __DIR__ . '/../bootstrap.php';
 use CampsiteAgent\Infrastructure\Database;
 use CampsiteAgent\Services\NotificationService;
 use CampsiteAgent\Repositories\UserFavoritesRepository;
+use CampsiteAgent\Repositories\EmailLogRepository;
 
 // Parse CLI options
 $options = getopt('', [
@@ -49,9 +50,17 @@ $log = function(string $msg) use ($verbose) {
 };
 
 try {
-	$pdo = Database::getConnection();
-	$notify = new NotificationService();
-	$favRepo = new UserFavoritesRepository();
+$pdo = Database::getConnection();
+$notify = new NotificationService();
+$favRepo = new UserFavoritesRepository();
+$emailLogs = new EmailLogRepository();
+
+// Prevent overlapping runs via a simple lock row using GET_LOCK
+$gotLock = $pdo->query("SELECT GET_LOCK('send_daily_digest_lock', 1) AS l")->fetchColumn();
+if ((int)$gotLock !== 1) {
+    fwrite(STDERR, "Another send-daily-digest process appears to be running. Exiting.\n");
+    exit(3);
+}
 
 	// Select users with at least one enabled preference
 	// Limit to a specific user if --user provided
@@ -76,10 +85,17 @@ try {
 
 	$sent = 0; $failed = 0; $skipped = 0; $details = [];
 
-	foreach ($users as $user) {
+    foreach ($users as $user) {
 		$userId = (int)$user['id'];
 		$email = $user['email'];
 		$log("Processing user: {$email}");
+
+        // Idempotency: skip if we already sent a Daily Digest to this email today
+        if ($emailLogs->hasSentDailyDigestToday($email)) {
+            $log("  ⏭️  Already sent Daily Digest today");
+            $skipped++;
+            continue;
+        }
 
 		// Load preferences (enabled only)
 		$st = $pdo->prepare('SELECT * FROM user_alert_preferences WHERE user_id = :uid AND enabled = 1');
@@ -207,7 +223,16 @@ try {
 			continue;
 		}
 
-		$ok = $notify->sendAvailabilityAlert($email, 'Daily Digest', $dateRangeStr, $userAlertSites, $favoriteSiteIds, $userId);
+		// Get park website URL for the first park in the results
+		$parkWebsiteUrl = null;
+		if (!empty($userAlertSites)) {
+			$firstParkName = $userAlertSites[0]['park_name'];
+			$stmt = $pdo->prepare('SELECT website_url FROM parks WHERE name = :name LIMIT 1');
+			$stmt->execute([':name' => $firstParkName]);
+			$parkWebsiteUrl = $stmt->fetchColumn();
+		}
+		
+		$ok = $notify->sendAvailabilityAlert($email, 'Daily Digest', $dateRangeStr, $userAlertSites, $favoriteSiteIds, $userId, $parkWebsiteUrl);
 		if ($ok) {
 			$sent++;
 			$details[] = ['email' => $email, 'sites' => count($userAlertSites)];
@@ -218,7 +243,10 @@ try {
 		}
 	}
 
-	// Summary
+    // Release lock
+    $pdo->query("DO RELEASE_LOCK('send_daily_digest_lock')");
+
+    // Summary
 	echo "\n📊 SUMMARY:\n";
 	echo "  Sent: $sent\n";
 	echo "  Failed: $failed\n";

@@ -38,7 +38,7 @@ class NotificationService
         return $this->sendAndLog($toEmail, $subject, $html, $text);
     }
 
-    public function sendAvailabilityAlert(string $toEmail, string $parkName, string $dateRange, array $sites, array $favoriteSiteIds = [], ?int $userId = null): bool
+    public function sendAvailabilityAlert(string $toEmail, string $parkName, string $dateRange, array $sites, array $favoriteSiteIds = [], ?int $userId = null, ?string $parkWebsiteUrl = null): bool
     {
         $subject = EmailTemplates::alertSubject($parkName, $dateRange);
         
@@ -51,8 +51,8 @@ class NotificationService
             $disableUrl = "{$protocol}://{$baseUrl}/api/user/disable-alerts/{$token}";
         }
         
-        $html = EmailTemplates::alertHtml($parkName, $dateRange, $sites, $favoriteSiteIds, $disableUrl);
-        $text = EmailTemplates::alertText($parkName, $dateRange, $sites, $favoriteSiteIds, $disableUrl);
+        $html = EmailTemplates::alertHtml($parkName, $dateRange, $sites, $favoriteSiteIds, $disableUrl, $parkWebsiteUrl);
+        $text = EmailTemplates::alertText($parkName, $dateRange, $sites, $favoriteSiteIds, $disableUrl, $parkWebsiteUrl);
         return $this->sendAndLog($toEmail, $subject, $html, $text);
     }
 
@@ -115,6 +115,18 @@ class NotificationService
             return ['sent' => 0, 'failed' => 0, 'skipped' => count($sites), 'message' => 'No users match preferences'];
         }
         
+        // Get park website URL
+        $parkWebsiteUrl = null;
+        if (!empty($sites)) {
+            $firstSite = $sites[0];
+            if (!empty($firstSite['park_id'])) {
+                $pdo = \CampsiteAgent\Infrastructure\Database::getConnection();
+                $stmt = $pdo->prepare('SELECT website_url FROM parks WHERE id = :id LIMIT 1');
+                $stmt->execute([':id' => $firstSite['park_id']]);
+                $parkWebsiteUrl = $stmt->fetchColumn();
+            }
+        }
+        
         // Send to each matching user
         foreach ($usersToNotify as $userId => $userData) {
             $success = $this->sendAvailabilityAlert(
@@ -123,7 +135,8 @@ class NotificationService
                 $dateRangeStr,
                 $sites,
                 $userData['favorite_site_ids'] ?? [],
-                $userId
+                $userId,
+                $parkWebsiteUrl
             );
             
             if ($success) {

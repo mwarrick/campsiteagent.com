@@ -148,7 +148,16 @@ if ($dryRun) {
         $favoriteSiteIds = $favRepo->listFavoriteSiteIds($userId);
         echo "  📧 Sending email with " . count($userAlertSites) . " sites ($dateRangeStr)\n";
         
-        $ok = $notify->sendAvailabilityAlert($user['email'], 'Daily Digest', $dateRangeStr, $userAlertSites, $favoriteSiteIds);
+        // Get park website URL for the first park in the results
+        $parkWebsiteUrl = null;
+        if (!empty($userAlertSites)) {
+            $firstParkName = $userAlertSites[0]['park_name'];
+            $stmt = $pdo->prepare('SELECT website_url FROM parks WHERE name = :name LIMIT 1');
+            $stmt->execute([':name' => $firstParkName]);
+            $parkWebsiteUrl = $stmt->fetchColumn();
+        }
+        
+        $ok = $notify->sendAvailabilityAlert($user['email'], 'Daily Digest', $dateRangeStr, $userAlertSites, $favoriteSiteIds, $userId, $parkWebsiteUrl);
         if ($ok) { 
             $sent++; 
             $details[] = ['email' => $user['email'], 'sites' => count($userAlertSites)];
