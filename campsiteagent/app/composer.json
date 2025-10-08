@@ -1,7 +1,7 @@
 {
   "name": "campsiteagent/app",
   "description": "Campsite Agent core app",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "type": "project",
   "require": {
     "php": ">=7.4",
