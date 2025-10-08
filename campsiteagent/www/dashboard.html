@@ -498,7 +498,9 @@
       q.set('pageSize', String(state.pageSize));
       q.set('sortBy', state.sortBy);
       q.set('sortDir', state.sortDir);
-      return q.toString();
+      const queryString = q.toString();
+      console.log('API Query:', queryString);
+      return queryString;
     }
 
     function hasWeekend(dates) {
@@ -739,15 +741,21 @@
     // Add event listeners for sort controls to trigger immediately
     document.getElementById('sortBy').addEventListener('change', () => {
       state.sortBy = document.getElementById('sortBy').value;
+      console.log('Sort By changed to:', state.sortBy);
       state.page = 1;
       loadData();
     });
 
     document.getElementById('sortDir').addEventListener('change', () => {
       state.sortDir = document.getElementById('sortDir').value;
+      console.log('Sort Dir changed to:', state.sortDir);
       state.page = 1;
       loadData();
     });
+
+    // Initialize sort controls with current state values
+    document.getElementById('sortBy').value = state.sortBy;
+    document.getElementById('sortDir').value = state.sortDir;
 
     // Also reapply immediately when toggling Favorites only (for responsiveness)
     document.getElementById('favoritesOnly').addEventListener('change', () => {
