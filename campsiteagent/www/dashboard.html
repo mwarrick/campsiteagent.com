@@ -736,6 +736,19 @@
       loadData();
     });
 
+    // Add event listeners for sort controls to trigger immediately
+    document.getElementById('sortBy').addEventListener('change', () => {
+      state.sortBy = document.getElementById('sortBy').value;
+      state.page = 1;
+      loadData();
+    });
+
+    document.getElementById('sortDir').addEventListener('change', () => {
+      state.sortDir = document.getElementById('sortDir').value;
+      state.page = 1;
+      loadData();
+    });
+
     // Also reapply immediately when toggling Favorites only (for responsiveness)
     document.getElementById('favoritesOnly').addEventListener('change', () => {
       loadData();
