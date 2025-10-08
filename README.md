@@ -15,10 +15,8 @@ CampsiteAgent.com is a web application that automatically monitors ReserveCalifo
 **🆕 New in v2.3:**
 - **🔗 Park Website Links**: Clickable links to official government park websites
   - Dashboard: Park names display with 🔗 symbol linking to official websites
-  - Emails: Park names are clickable links in both HTML and plain text emails
   - Admin: Full management interface for editing and testing park website URLs
 - **🏞️ Enhanced Parks Management**: Complete CRUD interface for park website URLs
-- **📧 Improved Email Experience**: Park names are now clickable links to official websites
 - **🔧 Admin Tools**: URL validation, testing, and bulk management capabilities
 
 **Previous Features (v2.2):**
@@ -469,9 +467,8 @@ This is a personal project shared for educational purposes only.
 ## 📋 Changelog
 
 ### Version 2.3.0 (October 2024)
-- **🔗 Park Website Links**: Added clickable links to official government park websites
+- **🔗 Park Website Links**: Added clickable links to official government park websites in dashboard
 - **🏞️ Enhanced Parks Management**: Complete admin interface for managing park website URLs
-- **📧 Improved Email Experience**: Park names are now clickable links to official websites
 - **🔧 Admin Tools**: URL validation, testing, and bulk management capabilities
 - **📱 Mobile Responsive**: Optimized admin interface for mobile devices
 
