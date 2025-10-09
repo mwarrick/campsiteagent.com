@@ -21,6 +21,26 @@
     .auth-section { margin-top: 30px; padding-top: 30px; border-top: 1px solid #e2e8f0; }
     .auth-section p { color: #4a5568; margin-bottom: 20px; }
     
+    /* Footer styles */
+    .footer { 
+      background: rgba(45, 55, 72, 0.95); 
+      color: #a0aec0; 
+      padding: 16px 20px; 
+      text-align: center; 
+      font-size: 14px; 
+      border-top: 1px solid #4a5568;
+      margin-top: 40px;
+      backdrop-filter: blur(10px);
+    }
+    .footer a { 
+      color: #63b3ed; 
+      text-decoration: none; 
+    }
+    .footer a:hover { 
+      color: #90cdf4; 
+      text-decoration: underline; 
+    }
+    
     /* Mobile Responsive Styles */
     @media (max-width: 768px) {
       .cta {
@@ -434,5 +454,10 @@
 
     checkAuth();
   </script>
+  
+  <!-- Footer -->
+  <footer class="footer">
+    Submit bugs and feature requests via <a href="https://github.com/mwarrick/campsiteagent.com/issues" target="_blank" rel="noopener noreferrer">GitHub Issues</a>
+  </footer>
 </body>
 </html>
