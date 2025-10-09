@@ -839,7 +839,7 @@
                 <div style="margin-left: 16px; margin-bottom: 8px;">
                   <div style="font-weight: 500; color: #059669; font-size: 14px;">
                     ${facilityName} (${sites.length} sites)
-                    <a href="#" onclick="openReserveCalifornia('${bookUrl}', '${friFormatted} - ${sunFormatted}'); return false;" style="margin-left: 8px; font-size: 12px; color: #2563eb; text-decoration: none;">→ View</a>
+                    <a href="#" class="reserve-link" data-url="${bookUrl}" data-date="${friFormatted} - ${sunFormatted}" style="margin-left: 8px; font-size: 12px; color: #2563eb; text-decoration: none;">→ View</a>
                     ${foundLabel ? `<span style=\"margin-left:8px; font-size:12px; color:#4a5568;\">${foundLabel}</span>` : ''}
                   </div>
                   <div style="font-size: 13px; color: #6b7280; margin-left: 8px;">
@@ -980,7 +980,7 @@
                 <div style="margin-left: 16px; margin-bottom: 8px;">
                   <div style="font-weight: 500; color: #059669; font-size: 14px;">
                     ${facilityName} (${sites.length} sites)
-                    <a href="#" onclick="openReserveCalifornia('${bookUrl}', '${dateFormatted}'); return false;" style="margin-left: 8px; font-size: 12px; color: #2563eb; text-decoration: none;">→ View</a>
+                    <a href="#" class="reserve-link" data-url="${bookUrl}" data-date="${dateFormatted}" style="margin-left: 8px; font-size: 12px; color: #2563eb; text-decoration: none;">→ View</a>
                   </div>
                   <div style="font-size: 13px; color: #6b7280; margin: 2px 0;">
                     ${siteNumbers}
@@ -1467,6 +1467,16 @@
     document.getElementById('preferencesBtn').addEventListener('click', openPreferences);
     document.getElementById('manageFavoritesGlobal').addEventListener('click', openManageFavoritesGlobal);
     document.getElementById('adminScraping').addEventListener('click', () => window.location.href = '/admin-scraping.html');
+    
+    // Event delegation for ReserveCalifornia links
+    document.addEventListener('click', (e) => {
+      if (e.target.classList.contains('reserve-link')) {
+        e.preventDefault();
+        const url = e.target.getAttribute('data-url');
+        const date = e.target.getAttribute('data-date');
+        openReserveCalifornia(url, date);
+      }
+    });
     
     // Close modal when clicking outside
     document.getElementById('preferencesModal').addEventListener('click', (e) => {
