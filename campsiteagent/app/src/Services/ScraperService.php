@@ -100,13 +100,7 @@ class ScraperService
             try {
                 $parkNumber = $park['park_number'] ?? $park['external_id'];
                 $siteEntries = $this->fetchMonths((string)$parkNumber, $monthsToScrape, $progressCallback);
-                // Fallback to stub if nothing returned
-                if (!$siteEntries) {
-                    $siteEntries = [
-                        ['site_number' => '12', 'site_type' => 'Tent', 'dates' => ['2025-10-10' => true, '2025-10-11' => true]],
-                        ['site_number' => '34', 'site_type' => 'RV', 'dates' => ['2025-10-10' => true, '2025-10-11' => false]],
-                    ];
-                }
+                // No fallback stub data - if scraping fails, return empty array
 
                 $weekendFound = false;
                 $alertSites = [];
