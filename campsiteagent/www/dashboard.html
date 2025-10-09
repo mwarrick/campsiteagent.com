@@ -405,13 +405,13 @@
       // Parse single date format (format: "Fri, Oct 10, 2025")
       const singleDateMatch = availabilityDate.match(/(\w+, \w+ \d+, \d+)/);
       if (singleDateMatch) {
-        // For single date: assume 2-night stay, so show start date through start date + 2 days
+        // For single date: assume 2-night stay, so show start date through start date + 2 days (3 days total)
         const dateStr = singleDateMatch[1];
         const dateMatch = dateStr.match(/(\w+, \w+ \d+), (\d+)/);
         if (dateMatch) {
           const startDate = new Date(dateMatch[1] + ', ' + dateMatch[2]);
           const endDate = new Date(startDate);
-          endDate.setDate(startDate.getDate() + 2);
+          endDate.setDate(startDate.getDate() + 2); // +2 days for 2-night stay (3 days total)
           
           const startFormatted = startDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
           const endFormatted = endDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
@@ -745,6 +745,10 @@
           const weekendSections = sortedWeekends.map(weekend => {
             const friFormatted = new Date(weekend.fri + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
             const satFormatted = new Date(weekend.sat + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+            // Calculate Sunday for 2-night stay (Friday to Sunday)
+            const sunDate = new Date(weekend.sat + 'T00:00:00');
+            sunDate.setDate(sunDate.getDate() + 1);
+            const sunFormatted = sunDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
             
             // Group sites by facility
             const byFacility = {};
@@ -790,7 +794,7 @@
                 <div style="margin-left: 16px; margin-bottom: 8px;">
                   <div style="font-weight: 500; color: #059669; font-size: 14px;">
                     ${facilityName} (${sites.length} sites)
-                    <a href="#" onclick="openReserveCalifornia('${bookUrl}', '${friFormatted} - ${satFormatted}'); return false;" style="margin-left: 8px; font-size: 12px; color: #2563eb; text-decoration: none;">→ View</a>
+                    <a href="#" onclick="openReserveCalifornia('${bookUrl}', '${friFormatted} - ${sunFormatted}'); return false;" style="margin-left: 8px; font-size: 12px; color: #2563eb; text-decoration: none;">→ View</a>
                     ${foundLabel ? `<span style=\"margin-left:8px; font-size:12px; color:#4a5568;\">${foundLabel}</span>` : ''}
                   </div>
                   <div style="font-size: 13px; color: #6b7280; margin-left: 8px;">
