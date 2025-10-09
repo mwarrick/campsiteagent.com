@@ -427,7 +427,9 @@
 
     // Function to show ReserveCalifornia modal and open link
     window.openReserveCalifornia = function(url, availabilityDate) {
+      console.log('openReserveCalifornia called with:', url, availabilityDate);
       const dateRange = getDateRangeText(availabilityDate);
+      console.log('Date range calculated:', dateRange);
       
       // Create modal HTML
       const modalHtml = `
@@ -1472,11 +1474,22 @@
     document.addEventListener('click', (e) => {
       if (e.target.classList.contains('reserve-link')) {
         e.preventDefault();
+        console.log('ReserveCalifornia link clicked!');
         const url = e.target.getAttribute('data-url');
         const date = e.target.getAttribute('data-date');
-        openReserveCalifornia(url, date);
+        console.log('URL:', url, 'Date:', date);
+        console.log('openReserveCalifornia function exists:', typeof openReserveCalifornia);
+        try {
+          openReserveCalifornia(url, date);
+        } catch (error) {
+          console.error('Error opening ReserveCalifornia modal:', error);
+          alert('Error opening ReserveCalifornia modal: ' + error.message);
+        }
       }
     });
+    
+    // Test function accessibility
+    console.log('openReserveCalifornia function available:', typeof window.openReserveCalifornia);
     
     // Close modal when clicking outside
     document.getElementById('preferencesModal').addEventListener('click', (e) => {
