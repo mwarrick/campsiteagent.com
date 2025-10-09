@@ -425,13 +425,58 @@
       return availabilityDate;
     }
 
-    // Function to show ReserveCalifornia popup and open link
+    // Function to show ReserveCalifornia modal and open link
     function openReserveCalifornia(url, availabilityDate) {
       const dateRange = getDateRangeText(availabilityDate);
-      const message = `Be sure to enter date range ${dateRange} on the ReserveCalifornia.com website.\n\nThis represents a 2-night stay (check-in through check-out).\n\nClick OK to continue.`;
       
-      if (confirm(message)) {
+      // Create modal HTML
+      const modalHtml = `
+        <div id="reserveModal" class="modal-overlay" style="display: flex;">
+          <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+              <h3>🗓️ ReserveCalifornia.com Date Range</h3>
+              <button id="closeReserveModal" class="btn-link" aria-label="Close">✖</button>
+            </div>
+            <div class="modal-body">
+              <div style="margin-bottom: 16px; padding: 12px; background: #f0f9ff; border-radius: 6px; border-left: 4px solid #0ea5e9;">
+                <div style="font-weight: 600; color: #0c4a6e; margin-bottom: 8px;">📅 Date Range to Enter:</div>
+                <div style="font-size: 18px; font-weight: 700; color: #0369a1;">${dateRange}</div>
+              </div>
+              <div style="margin-bottom: 16px; padding: 12px; background: #fef3c7; border-radius: 6px; border-left: 4px solid #f59e0b;">
+                <div style="font-weight: 600; color: #92400e; margin-bottom: 4px;">ℹ️ Important:</div>
+                <div style="color: #92400e; font-size: 14px;">This represents a 2-night stay (check-in through check-out)</div>
+              </div>
+              <div style="color: #4b5563; font-size: 14px; margin-bottom: 20px;">
+                When you click "Continue to ReserveCalifornia.com", make sure to enter the date range above in their booking system.
+              </div>
+              <div class="form-actions">
+                <button id="cancelReserve" class="btn btn-secondary">Cancel</button>
+                <button id="continueReserve" class="btn btn-primary">Continue to ReserveCalifornia.com</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      // Add modal to page
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
+      
+      // Add event listeners
+      document.getElementById('closeReserveModal').addEventListener('click', closeReserveModal);
+      document.getElementById('cancelReserve').addEventListener('click', closeReserveModal);
+      document.getElementById('continueReserve').addEventListener('click', () => {
+        closeReserveModal();
         window.open(url, '_blank');
+      });
+      document.getElementById('reserveModal').addEventListener('click', (e) => {
+        if (e.target.id === 'reserveModal') closeReserveModal();
+      });
+    }
+    
+    function closeReserveModal() {
+      const modal = document.getElementById('reserveModal');
+      if (modal) {
+        modal.remove();
       }
     }
 
