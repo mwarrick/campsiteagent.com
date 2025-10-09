@@ -26,6 +26,12 @@ CampsiteAgent.com is a web application that automatically monitors ReserveCalifo
   - Support for multiple park website formats and HTML structures
   - Specific parsing for Silverwood Lake SRA safety alerts
   - Flexible regex patterns for various alert types
+- **🗓️ ReserveCalifornia Booking Assistant**: Smart modal for booking guidance
+  - Automatic date range detection for weekend vs daily listings
+  - Professional modal with booking instructions and date reminders
+  - Weekend listings: Shows 3-day date range for 2-night stays
+  - Daily listings: Shows single start date for 1-night stays
+  - Clear instructions for entering dates on ReserveCalifornia.com
 
 **Previous Features (v2.0):**
 - **"Disable All Alerts" links** in digest emails for easy opt-out
@@ -488,6 +494,12 @@ This is a personal project shared for educational purposes only.
   - Support for multiple park website formats and HTML structures
   - Specific parsing for Silverwood Lake SRA safety alerts
   - Flexible regex patterns for various alert types
+- **🗓️ ReserveCalifornia Booking Assistant**: Smart modal for booking guidance
+  - Automatic date range detection for weekend vs daily listings
+  - Professional modal with booking instructions and date reminders
+  - Weekend listings: Shows 3-day date range for 2-night stays
+  - Daily listings: Shows single start date for 1-night stays
+  - Clear instructions for entering dates on ReserveCalifornia.com
 - **🐛 Bug Fixes**: Fixed admin authentication issues and inconsistent button styling
 
 ### Version 2.0.0 (October 2025)
