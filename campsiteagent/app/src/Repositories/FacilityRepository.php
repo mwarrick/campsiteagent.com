@@ -22,9 +22,7 @@ class FacilityRepository
         int $parkId, 
         string $name, 
         ?string $facilityId = null, 
-        ?string $description = null,
-        ?bool $allowWebBooking = null,
-        ?int $facilityType = null
+        ?string $description = null
     ): int {
         // Try to find existing facility by facility_id (external ID)
         if ($facilityId !== null) {
@@ -37,16 +35,12 @@ class FacilityRepository
                 // Update existing facility
                 $updateSql = 'UPDATE facilities SET 
                     name = :name,
-                    description = :description,
-                    allow_web_booking = :allow_web_booking,
-                    facility_type = :facility_type
+                    description = :description
                     WHERE id = :id';
                 $updateStmt = $this->pdo->prepare($updateSql);
                 $updateStmt->execute([
                     ':name' => $name,
                     ':description' => $description,
-                    ':allow_web_booking' => $allowWebBooking ?? true,
-                    ':facility_type' => $facilityType ?? 1,
                     ':id' => $existing['id']
                 ]);
                 return (int)$existing['id'];
@@ -55,18 +49,16 @@ class FacilityRepository
 
         // Create new facility
         $sql = 'INSERT INTO facilities (
-            park_id, facility_id, name, description, allow_web_booking, facility_type
+            park_id, facility_id, name, description
         ) VALUES (
-            :park_id, :facility_id, :name, :description, :allow_web_booking, :facility_type
+            :park_id, :facility_id, :name, :description
         )';
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
             ':park_id' => $parkId,
             ':facility_id' => $facilityId,
             ':name' => $name,
-            ':description' => $description,
-            ':allow_web_booking' => $allowWebBooking ?? true,
-            ':facility_type' => $facilityType ?? 1
+            ':description' => $description
         ]);
         
         return (int)$this->pdo->lastInsertId();
