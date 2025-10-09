@@ -1181,21 +1181,6 @@
     // Initialize
     checkAuth();
     loadParks().then(() => loadFavorites()).then(loadData);
-
-    // Display session ID for debugging
-    function getCookie(name) {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop().split(';').shift();
-      return null;
-    }
-    const sessionId = getCookie('PHPSESSID');
-    if (sessionId) {
-      const debugDiv = document.createElement('div');
-      debugDiv.style.cssText = 'position: fixed; bottom: 0; left: 0; right: 0; background: #1a202c; color: #a0aec0; padding: 8px 16px; font-size: 11px; font-family: monospace; text-align: center; z-index: 1000;';
-      debugDiv.innerHTML = `Session ID: ${sessionId} <button onclick="navigator.clipboard.writeText('${sessionId}'); this.textContent='Copied!'" style="margin-left: 8px; padding: 2px 8px; background: #2d3748; border: none; color: #fff; cursor: pointer; border-radius: 4px;">Copy</button>`;
-      document.body.appendChild(debugDiv);
-    }
   </script>
   
   <!-- Footer -->
