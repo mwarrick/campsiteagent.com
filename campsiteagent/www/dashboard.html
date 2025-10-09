@@ -426,7 +426,7 @@
     }
 
     // Function to show ReserveCalifornia modal and open link
-    function openReserveCalifornia(url, availabilityDate) {
+    window.openReserveCalifornia = function(url, availabilityDate) {
       const dateRange = getDateRangeText(availabilityDate);
       
       // Create modal HTML
@@ -473,7 +473,7 @@
       });
     }
     
-    function closeReserveModal() {
+    window.closeReserveModal = function() {
       const modal = document.getElementById('reserveModal');
       if (modal) {
         modal.remove();
