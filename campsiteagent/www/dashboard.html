@@ -433,13 +433,13 @@
       
       // Create modal HTML
       const modalHtml = `
-        <div id="reserveModal" class="modal-overlay" style="display: flex;">
-          <div class="modal" style="max-width: 500px;">
+        <div id="reserveModal" class="modal show">
+          <div class="modal-content" style="max-width: 500px;">
             <div class="modal-header">
-              <h3>🗓️ ReserveCalifornia.com Date Range</h3>
-              <button id="closeReserveModal" class="btn-link" aria-label="Close">✖</button>
+              <h2>🗓️ ReserveCalifornia.com Date Range</h2>
+              <button id="closeReserveModal" class="close-btn" aria-label="Close">✕ Close</button>
             </div>
-            <div class="modal-body">
+            <div style="padding: 0 24px 24px 24px;">
               <div style="margin-bottom: 16px; padding: 12px; background: #f0f9ff; border-radius: 6px; border-left: 4px solid #0ea5e9;">
                 <div style="font-weight: 600; color: #0c4a6e; margin-bottom: 8px;">📅 Date Range to Enter:</div>
                 <div style="font-size: 18px; font-weight: 700; color: #0369a1;">${dateRange}</div>
@@ -451,9 +451,9 @@
               <div style="color: #4b5563; font-size: 14px; margin-bottom: 20px;">
                 When you click "Continue to ReserveCalifornia.com", make sure to enter the date range above in their booking system.
               </div>
-              <div class="form-actions">
-                <button id="cancelReserve" class="btn btn-secondary">Cancel</button>
-                <button id="continueReserve" class="btn btn-primary">Continue to ReserveCalifornia.com</button>
+              <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button id="cancelReserve" class="close-btn">Cancel</button>
+                <button id="continueReserve" style="background: #3b82f6; color: white; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer;">Continue to ReserveCalifornia.com</button>
               </div>
             </div>
           </div>
@@ -461,9 +461,12 @@
       `;
       
       // Add modal to page
+      console.log('Adding modal to page...');
       document.body.insertAdjacentHTML('beforeend', modalHtml);
+      console.log('Modal added to page');
       
       // Add event listeners
+      console.log('Adding event listeners...');
       document.getElementById('closeReserveModal').addEventListener('click', closeReserveModal);
       document.getElementById('cancelReserve').addEventListener('click', closeReserveModal);
       document.getElementById('continueReserve').addEventListener('click', () => {
@@ -473,12 +476,25 @@
       document.getElementById('reserveModal').addEventListener('click', (e) => {
         if (e.target.id === 'reserveModal') closeReserveModal();
       });
+      console.log('Event listeners added');
+      
+      // Check if modal is visible
+      const modal = document.getElementById('reserveModal');
+      console.log('Modal element found:', modal);
+      console.log('Modal display style:', modal ? modal.style.display : 'not found');
+      console.log('Modal computed style:', modal ? window.getComputedStyle(modal).display : 'not found');
     }
     
     window.closeReserveModal = function() {
       const modal = document.getElementById('reserveModal');
       if (modal) {
-        modal.remove();
+        modal.classList.remove('show');
+        // Remove modal after animation
+        setTimeout(() => {
+          if (modal.parentNode) {
+            modal.remove();
+          }
+        }, 300);
       }
     }
 
