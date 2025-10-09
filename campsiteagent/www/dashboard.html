@@ -398,12 +398,26 @@
       // Parse the availability date (format: "Fri, Oct 10 - Sat, Oct 11, 2025" or "Fri, Oct 10, 2025")
       const weekendMatch = availabilityDate.match(/(\w+, \w+ \d+) - (\w+, \w+ \d+, \d+)/);
       if (weekendMatch) {
+        // For weekend stays: show start date through end date (2 nights)
         return `${weekendMatch[1]}, 2025 - ${weekendMatch[2]}`;
       }
       
       // Parse single date format (format: "Fri, Oct 10, 2025")
       const singleDateMatch = availabilityDate.match(/(\w+, \w+ \d+, \d+)/);
       if (singleDateMatch) {
+        // For single date: assume 2-night stay, so show start date through start date + 2 days
+        const dateStr = singleDateMatch[1];
+        const dateMatch = dateStr.match(/(\w+, \w+ \d+), (\d+)/);
+        if (dateMatch) {
+          const startDate = new Date(dateMatch[1] + ', ' + dateMatch[2]);
+          const endDate = new Date(startDate);
+          endDate.setDate(startDate.getDate() + 2);
+          
+          const startFormatted = startDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+          const endFormatted = endDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+          
+          return `${startFormatted}, ${dateMatch[2]} - ${endFormatted}`;
+        }
         return singleDateMatch[1];
       }
       
@@ -414,7 +428,7 @@
     // Function to show ReserveCalifornia popup and open link
     function openReserveCalifornia(url, availabilityDate) {
       const dateRange = getDateRangeText(availabilityDate);
-      const message = `Be sure to enter date range ${dateRange} on the ReserveCalifornia.com website.\n\nClick OK to continue.`;
+      const message = `Be sure to enter date range ${dateRange} on the ReserveCalifornia.com website.\n\nThis represents a 2-night stay (check-in through check-out).\n\nClick OK to continue.`;
       
       if (confirm(message)) {
         window.open(url, '_blank');
