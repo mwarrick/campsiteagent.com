@@ -1,6 +1,6 @@
 # CampsiteAgent.com
 
-**Version 2.3.1** - October 2025 (STABLE)
+**Version 2.1.0** - October 2025 (STABLE)
 
 Automated monitoring system for California State Park campground availability, focusing on weekend availability at popular Southern California parks.
 
@@ -10,16 +10,24 @@ CampsiteAgent.com is a web application that automatically monitors ReserveCalifo
 
 ## ✨ Features
 
-### ✅ Core Functionality (v2.3)
+### ✅ Core Functionality (v2.1)
 
-**🆕 New in v2.3:**
-- **🔗 Park Website Links**: Clickable links to official government park websites
-  - Dashboard: Park names display with 🔗 symbol linking to official websites
-  - Admin: Full management interface for editing and testing park website URLs
-- **🏞️ Enhanced Parks Management**: Complete CRUD interface for park website URLs
-- **🔧 Admin Tools**: URL validation, testing, and bulk management capabilities
+**🆕 New in v2.1:**
+- **🚨 Park Alerts System**: Real-time park closure and restriction notifications
+  - Automatic scraping of park safety alerts and restrictions
+  - Critical alerts for bear activity, water quality, and facility closures
+  - Color-coded alert display (Critical/Warning/Info) in dashboard
+  - Admin interface for managing and viewing all park alerts
+- **🔧 Unified Admin Panel**: Consolidated all admin functions into one interface
+  - Parks management, facilities management, user management, and data tools
+  - Modal-based user management integrated into main admin panel
+  - Improved button styling and consistent UI design
+- **📋 Enhanced Alert Parsing**: Better detection of park safety information
+  - Support for multiple park website formats and HTML structures
+  - Specific parsing for Silverwood Lake SRA safety alerts
+  - Flexible regex patterns for various alert types
 
-**Previous Features (v2.2):**
+**Previous Features (v2.0):**
 - **"Disable All Alerts" links** in digest emails for easy opt-out
 - **"Email Digest Now" button** on user dashboard for on-demand emails
 - **Separate scraping and emailing** processes for better reliability
@@ -466,12 +474,23 @@ This is a personal project shared for educational purposes only.
 
 ## 📋 Changelog
 
-### Version 2.3.1 (October 2025)
-- **🎯 Simplified Dashboard**: Removed non-functional sort controls for cleaner, more reliable interface
-- **🔧 Bug Fixes**: Fixed "All parks" view to show multiple parks instead of just one
-- **⚡ Performance**: Streamlined API queries with consistent default sorting
+### Version 2.1.0 (October 9, 2025)
+- **🚨 Park Alerts System**: Real-time park closure and restriction notifications
+  - Automatic scraping of park safety alerts and restrictions
+  - Critical alerts for bear activity, water quality, and facility closures
+  - Color-coded alert display (Critical/Warning/Info) in dashboard
+  - Admin interface for managing and viewing all park alerts
+- **🔧 Unified Admin Panel**: Consolidated all admin functions into one interface
+  - Parks management, facilities management, user management, and data tools
+  - Modal-based user management integrated into main admin panel
+  - Improved button styling and consistent UI design
+- **📋 Enhanced Alert Parsing**: Better detection of park safety information
+  - Support for multiple park website formats and HTML structures
+  - Specific parsing for Silverwood Lake SRA safety alerts
+  - Flexible regex patterns for various alert types
+- **🐛 Bug Fixes**: Fixed admin authentication issues and inconsistent button styling
 
-### Version 2.3.0 (October 2025)
+### Version 2.0.0 (October 2025)
 - **🔗 Park Website Links**: Added clickable links to official government park websites in dashboard
 - **🏞️ Enhanced Parks Management**: Complete admin interface for managing park website URLs
 - **🔧 Admin Tools**: URL validation, testing, and bulk management capabilities

@@ -22,9 +22,37 @@ class FacilityRepository
         int $parkId, 
         string $name, 
         ?string $facilityId = null, 
-        ?string $description = null
+        ?string $description = null,
+        ?string $externalFacilityId = null
     ): int {
-        // Try to find existing facility by facility_id (external ID)
+        // Try to find existing facility by external_facility_id first, then facility_id
+        if ($externalFacilityId !== null) {
+            $sql = 'SELECT id FROM facilities WHERE park_id = :park_id AND external_facility_id = :external_facility_id LIMIT 1';
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([':park_id' => $parkId, ':external_facility_id' => $externalFacilityId]);
+            $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($existing) {
+                // Update existing facility
+                $updateSql = 'UPDATE facilities SET 
+                    name = :name,
+                    description = :description,
+                    facility_id = :facility_id,
+                    external_facility_id = :external_facility_id
+                    WHERE id = :id';
+                $updateStmt = $this->pdo->prepare($updateSql);
+                $updateStmt->execute([
+                    ':name' => $name,
+                    ':description' => $description,
+                    ':facility_id' => $facilityId,
+                    ':external_facility_id' => $externalFacilityId,
+                    ':id' => $existing['id']
+                ]);
+                return (int)$existing['id'];
+            }
+        }
+        
+        // Fallback: try to find by facility_id (legacy)
         if ($facilityId !== null) {
             $sql = 'SELECT id FROM facilities WHERE park_id = :park_id AND facility_id = :facility_id LIMIT 1';
             $stmt = $this->pdo->prepare($sql);
@@ -32,15 +60,17 @@ class FacilityRepository
             $existing = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if ($existing) {
-                // Update existing facility
+                // Update existing facility with external_facility_id
                 $updateSql = 'UPDATE facilities SET 
                     name = :name,
-                    description = :description
+                    description = :description,
+                    external_facility_id = :external_facility_id
                     WHERE id = :id';
                 $updateStmt = $this->pdo->prepare($updateSql);
                 $updateStmt->execute([
                     ':name' => $name,
                     ':description' => $description,
+                    ':external_facility_id' => $externalFacilityId,
                     ':id' => $existing['id']
                 ]);
                 return (int)$existing['id'];
@@ -49,16 +79,17 @@ class FacilityRepository
 
         // Create new facility
         $sql = 'INSERT INTO facilities (
-            park_id, facility_id, name, description
+            park_id, facility_id, name, description, external_facility_id
         ) VALUES (
-            :park_id, :facility_id, :name, :description
+            :park_id, :facility_id, :name, :description, :external_facility_id
         )';
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
             ':park_id' => $parkId,
             ':facility_id' => $facilityId,
             ':name' => $name,
-            ':description' => $description
+            ':description' => $description,
+            ':external_facility_id' => $externalFacilityId
         ]);
         
         return (int)$this->pdo->lastInsertId();

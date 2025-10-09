@@ -93,7 +93,9 @@ class MetadataSyncService
             $dbId = $this->facilities->upsertFacility(
                 $parkId,
                 $facility['name'],
-                $facility['facility_id']
+                $facility['facility_id'],
+                null, // description
+                $facility['facility_id'] // external_facility_id
             );
             $facilityMap[$facility['facility_id']] = $dbId;
             $facilitiesCount++;
@@ -110,16 +112,26 @@ class MetadataSyncService
         
         // 4. Save site metadata (without availability data)
         foreach ($sites as $site) {
+            // Validate facility_db_id before creating site
+            $facilityDbId = $site['facility_db_id'] ?? null;
+            if ($facilityDbId === null) {
+                error_log("MetadataSyncService: Skipping site {$site['site_number']} in park {$parkId} - no facility_db_id");
+                continue;
+            }
+            
             $this->sites->upsertSite(
                 $parkId,
                 $site['site_number'],
                 $site['site_type'] ?? null,
                 [], // attributes_json
-                $site['facility_db_id'] ?? null,
+                $facilityDbId,
                 $site['site_name'] ?? null,
                 $site['unit_type_id'] ?? null,
                 $site['is_ada'] ?? false,
-                $site['vehicle_length'] ?? 0
+                $site['vehicle_length'] ?? 0,
+                $site['site_number'], // external_site_id (API site number)
+                $site['unit_type_id'] ? (string)$site['unit_type_id'] : null, // external_unit_type_id
+                $site['facility_id'] // external_facility_id (API facility ID)
             );
             $sitesCount++;
         }

@@ -23,7 +23,10 @@ class SiteRepository
         ?string $siteName = null,
         ?int $unitTypeId = null,
         ?bool $isAda = null,
-        ?int $vehicleLength = null
+        ?int $vehicleLength = null,
+        ?string $externalSiteId = null,
+        ?string $externalUnitTypeId = null,
+        ?string $externalFacilityId = null
     ): int {
         // Find existing by park_id, facility_id, and site_number
         $sql = 'SELECT id FROM sites WHERE park_id = :park_id AND site_number = :site_number';
@@ -49,7 +52,10 @@ class SiteRepository
                 unit_type_id = :unit_type_id,
                 is_ada = :is_ada,
                 vehicle_length = :vehicle_length,
-                attributes_json = :attributes_json, 
+                attributes_json = :attributes_json,
+                external_site_id = :external_site_id,
+                external_unit_type_id = :external_unit_type_id,
+                external_facility_id = :external_facility_id,
                 updated_at = NOW() 
                 WHERE id = :id');
             $updateParams = [
@@ -60,6 +66,9 @@ class SiteRepository
                 ':is_ada' => $isAda ? 1 : 0,
                 ':vehicle_length' => $vehicleLength ?? 0,
                 ':attributes_json' => json_encode($attributes, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                ':external_site_id' => $externalSiteId,
+                ':external_unit_type_id' => $externalUnitTypeId,
+                ':external_facility_id' => $externalFacilityId,
                 ':id' => $row['id'],
             ];
             
@@ -76,10 +85,12 @@ class SiteRepository
         // Insert new site
         $ins = $this->pdo->prepare('INSERT INTO sites (
             park_id, facility_id, site_number, site_name, site_type, 
-            unit_type_id, is_ada, vehicle_length, attributes_json
+            unit_type_id, is_ada, vehicle_length, attributes_json,
+            external_site_id, external_unit_type_id, external_facility_id
         ) VALUES (
             :park_id, :facility_id, :site_number, :site_name, :site_type,
-            :unit_type_id, :is_ada, :vehicle_length, :attributes_json
+            :unit_type_id, :is_ada, :vehicle_length, :attributes_json,
+            :external_site_id, :external_unit_type_id, :external_facility_id
         )');
         $params = [
             ':park_id' => $parkId,
@@ -91,6 +102,9 @@ class SiteRepository
             ':is_ada' => $isAda ? 1 : 0,
             ':vehicle_length' => $vehicleLength ?? 0,
             ':attributes_json' => json_encode($attributes, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            ':external_site_id' => $externalSiteId,
+            ':external_unit_type_id' => $externalUnitTypeId,
+            ':external_facility_id' => $externalFacilityId,
         ];
         
         try {

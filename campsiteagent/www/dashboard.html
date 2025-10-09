@@ -50,21 +50,58 @@
     
     /* Footer styles */
     .footer { 
-      background: #2d3748; 
-      color: #a0aec0; 
-      padding: 16px 20px; 
-      text-align: center; 
-      font-size: 14px; 
-      border-top: 1px solid #4a5568;
-      margin-top: 40px;
+        background: #2d3748; 
+        color: #a0aec0; 
+        padding: 16px 20px; 
+        text-align: center; 
+        font-size: 14px; 
+        border-top: 1px solid #4a5568;
+        margin-top: 40px;
     }
     .footer a { 
-      color: #63b3ed; 
-      text-decoration: none; 
+        color: #63b3ed; 
+        text-decoration: none; 
     }
     .footer a:hover { 
-      color: #90cdf4; 
-      text-decoration: underline; 
+        color: #90cdf4; 
+        text-decoration: underline; 
+    }
+
+    /* Park Alert styles */
+    .park-alert {
+        margin-bottom: 12px;
+        padding: 12px 16px;
+        border-radius: 6px;
+        border-left: 4px solid;
+        font-size: 14px;
+        line-height: 1.4;
+    }
+    .park-alert.alert-critical {
+        background: #fef2f2;
+        border-left-color: #dc2626;
+        color: #991b1b;
+    }
+    .park-alert.alert-warning {
+        background: #fffbeb;
+        border-left-color: #d97706;
+        color: #92400e;
+    }
+    .park-alert.alert-info {
+        background: #eff6ff;
+        border-left-color: #2563eb;
+        color: #1e40af;
+    }
+    .park-alert .alert-icon {
+        margin-right: 8px;
+        font-size: 16px;
+    }
+    .park-alert .alert-title {
+        font-weight: 600;
+    }
+    .park-alert .alert-description {
+        margin-top: 4px;
+        font-size: 13px;
+        opacity: 0.9;
     }
     body { 
       margin-bottom: 0; 
@@ -223,8 +260,7 @@
         <span id="userInfo" style="display: none;"></span>
         <button id="preferencesBtn" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); display: none;">⚙️ Preferences</button>
         <button id="manageFavoritesGlobal" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); margin-left: 8px; display: none;">★ Manage Favorites</button>
-        <button id="adminScraping" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); margin-left: 8px; display: none;">🔧 Admin Scraping</button>
-        <button id="adminUsers" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); margin-left: 8px; display: none;">👥 User Management</button>
+        <button id="adminScraping" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); margin-left: 8px; display: none;">🔧 Admin</button>
         <button id="loginBtn" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); margin-left: 8px;">Login</button>
         <button id="registerBtn" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); margin-left: 8px;">Register</button>
         <button id="logoutBtn" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); margin-left: 8px; display: none;">Logout</button>
@@ -575,6 +611,7 @@
       let json = {};
       try { json = text ? JSON.parse(text) : {}; } catch (_) { json = {}; }
       const data = json.data || [];
+      console.log('Dashboard data received:', data.length, 'parks');
       renderSummary(data);
       if (data.length === 0) {
         container.innerHTML = '<div class="card"><span class="empty">No upcoming availability found.</span></div>';
@@ -625,7 +662,24 @@
             const parkName = park.website_url 
               ? `${park.park} <a href="${park.website_url}" target="_blank" style="color: #2b6cb0; text-decoration: none; margin-left: 8px;" title="Visit official park website">🔗</a>`
               : park.park;
-            return `<div class="card"><div class="park">${parkName}</div><div class="empty">No weekend availability found.</div></div>`;
+            
+            // Add park alerts if any
+            let alertsHtml = '';
+            if (park.alerts && Array.isArray(park.alerts) && park.alerts.length > 0) {
+              alertsHtml = park.alerts.map(alert => {
+                const severityClass = alert.severity === 'critical' ? 'alert-critical' : 
+                                     alert.severity === 'warning' ? 'alert-warning' : 'alert-info';
+                const icon = alert.severity === 'critical' ? '🚨' : 
+                            alert.severity === 'warning' ? '⚠️' : 'ℹ️';
+                return `<div class="park-alert ${severityClass}">
+                          <span class="alert-icon">${icon}</span>
+                          <span class="alert-title">${alert.title}</span>
+                          ${alert.description ? `<div class="alert-description">${alert.description}</div>` : ''}
+                        </div>`;
+              }).join('');
+            }
+            
+            return `<div class="card"><div class="park">${parkName}</div>${alertsHtml}<div class="empty">No weekend availability found.</div></div>`;
           }
           
           const weekendSections = sortedWeekends.map(weekend => {
@@ -708,20 +762,157 @@
           const parkName = park.website_url 
             ? `${park.park} <a href="${park.website_url}" target="_blank" style="color: #2b6cb0; text-decoration: none; margin-left: 8px;" title="Visit official park website">🔗</a>`
             : park.park;
-          return `<div class="card"><div class="park">${parkName}</div>${weekendSections}</div>`;
+          
+          // Add park alerts if any
+          let alertsHtml = '';
+          if (park.alerts && Array.isArray(park.alerts) && park.alerts.length > 0) {
+            alertsHtml = park.alerts.map(alert => {
+              const severityClass = alert.severity === 'critical' ? 'alert-critical' : 
+                                   alert.severity === 'warning' ? 'alert-warning' : 'alert-info';
+              const icon = alert.severity === 'critical' ? '🚨' : 
+                          alert.severity === 'warning' ? '⚠️' : 'ℹ️';
+              return `<div class="park-alert ${severityClass}">
+                        <span class="alert-icon">${icon}</span>
+                        <span class="alert-title">${alert.title}</span>
+                        ${alert.description ? `<div class="alert-description">${alert.description}</div>` : ''}
+                      </div>`;
+            }).join('');
+          }
+          
+          return `<div class="card"><div class="park">${parkName}</div>${alertsHtml}${weekendSections}</div>`;
         }).join('');
       } else {
-        // Original view: group by site
+        // All-days view: use same formatting as weekend view but group by date
         container.innerHTML = data.map(park => {
-          const sites = park.sites.map(s => {
-            const dates = (s.dates || []).join(', ');
-            const type = s.site_type ? `<span class="badge">${s.site_type}</span>` : '';
-            return `<div class="site"><div>Site ${s.site_number} ${type}</div><div class="dates">${dates}</div></div>`;
+          // Group sites by date
+          const byDate = {};
+          
+          park.sites.forEach(site => {
+            const dates = site.dates || [];
+            dates.forEach(d => {
+              if (!byDate[d]) {
+                byDate[d] = [];
+              }
+              byDate[d].push(site);
+            });
+          });
+          
+          // Sort dates
+          const sortedDates = Object.keys(byDate).sort();
+          
+          if (sortedDates.length === 0) {
+            const parkName = park.website_url 
+              ? `${park.park} <a href="${park.website_url}" target="_blank" style="color: #2b6cb0; text-decoration: none; margin-left: 8px;" title="Visit official park website">🔗</a>`
+              : park.park;
+            
+            // Add park alerts if any
+            let alertsHtml = '';
+            if (park.alerts && Array.isArray(park.alerts) && park.alerts.length > 0) {
+              alertsHtml = park.alerts.map(alert => {
+                const severityClass = alert.severity === 'critical' ? 'alert-critical' : 
+                                     alert.severity === 'warning' ? 'alert-warning' : 'alert-info';
+                const icon = alert.severity === 'critical' ? '🚨' : 
+                            alert.severity === 'warning' ? '⚠️' : 'ℹ️';
+                return `<div class="park-alert ${severityClass}">
+                          <span class="alert-icon">${icon}</span>
+                          <span class="alert-title">${alert.title}</span>
+                          ${alert.description ? `<div class="alert-description">${alert.description}</div>` : ''}
+                        </div>`;
+              }).join('');
+            }
+            
+            return `<div class="card"><div class="park">${parkName}</div>${alertsHtml}<div class="empty">No availability found.</div></div>`;
+          }
+          
+          const dateSections = sortedDates.map(date => {
+            const dateFormatted = new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+            
+            // Group sites by facility
+            const byFacility = {};
+            byDate[date].forEach(s => {
+              const facilityName = s.facility_name || 'Unknown Facility';
+              if (!byFacility[facilityName]) {
+                byFacility[facilityName] = [];
+              }
+              byFacility[facilityName].push(s);
+            });
+            
+            // Build facility sections with booking links
+            let totalShownOnDate = 0;
+            const facilitySections = Object.keys(byFacility).sort().map(facilityName => {
+              let sites = byFacility[facilityName].slice();
+              // If favorites only is selected, filter to favorites
+              const favOnly = document.getElementById('favoritesOnly')?.checked;
+              if (favOnly) {
+                sites = sites.filter(s => favoriteSiteIds.has(s.site_id));
+              }
+              // Skip this facility if no sites remain
+              if (!sites.length) return '';
+              // Sort favorites first
+              sites.sort((a,b) => {
+                const af = favoriteSiteIds.has(a.site_id);
+                const bf = favoriteSiteIds.has(b.site_id);
+                if (af === bf) return String(a.site_number).localeCompare(String(b.site_number));
+                return af ? -1 : 1;
+              });
+              totalShownOnDate += sites.length;
+              const siteNumbers = sites.map(s => s.site_number).join(', ');
+              
+              // Link to park page
+              const parkNumber = park.park_number || '712'; // fallback to San Onofre
+              const bookUrl = `https://reservecalifornia.com/Web/Default.aspx#!park/${parkNumber}`;
+              
+              // Discovery time label from earliest found_at among sites in this facility group
+              const foundTimes = sites.map(s => s.found_at).filter(Boolean).sort();
+              const foundAt = foundTimes.length ? new Date(foundTimes[0].replace(' ', 'T')) : null;
+              const foundLabel = foundAt ? `Found ${foundAt.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' })} @ ${foundAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}` : '';
+
+              return `
+                <div style="margin-left: 16px; margin-bottom: 8px;">
+                  <div style="font-weight: 500; color: #059669; font-size: 14px;">
+                    ${facilityName} (${sites.length} sites)
+                    <a href="${bookUrl}" target="_blank" style="margin-left: 8px; font-size: 12px; color: #2563eb; text-decoration: none;">→ View</a>
+                  </div>
+                  <div style="font-size: 13px; color: #6b7280; margin: 2px 0;">
+                    ${siteNumbers}
+                  </div>
+                  ${foundLabel ? `<div style="font-size: 11px; color: #9ca3af; margin-top: 2px;">${foundLabel}</div>` : ''}
+                </div>
+              `;
+            }).filter(Boolean).join('');
+            
+            return `
+              <div style="margin-bottom: 16px; padding: 12px; background: #f8fafc; border-radius: 6px; border-left: 3px solid #3b82f6;">
+                <div style="font-weight: 600; color: #1e40af; font-size: 15px; margin-bottom: 4px;">
+                  📅 ${dateFormatted}
+                </div>
+                <div style="font-size: 14px; color: #4b5563; margin-bottom: 8px;">${totalShownOnDate} site${totalShownOnDate === 1 ? '' : 's'} available</div>
+                ${facilitySections}
+              </div>
+            `;
           }).join('');
+          
           const parkName = park.website_url 
             ? `${park.park} <a href="${park.website_url}" target="_blank" style="color: #2b6cb0; text-decoration: none; margin-left: 8px;" title="Visit official park website">🔗</a>`
             : park.park;
-          return `<div class="card"><div class="park">${parkName}</div>${sites || '<div class="empty">No sites available.</div>'}</div>`;
+          
+          // Add park alerts if any
+          let alertsHtml = '';
+          if (park.alerts && Array.isArray(park.alerts) && park.alerts.length > 0) {
+            alertsHtml = park.alerts.map(alert => {
+              const severityClass = alert.severity === 'critical' ? 'alert-critical' : 
+                                   alert.severity === 'warning' ? 'alert-warning' : 'alert-info';
+              const icon = alert.severity === 'critical' ? '🚨' : 
+                          alert.severity === 'warning' ? '⚠️' : 'ℹ️';
+              return `<div class="park-alert ${severityClass}">
+                        <span class="alert-icon">${icon}</span>
+                        <span class="alert-title">${alert.title}</span>
+                        ${alert.description ? `<div class="alert-description">${alert.description}</div>` : ''}
+                      </div>`;
+            }).join('');
+          }
+          
+          return `<div class="card"><div class="park">${parkName}</div>${alertsHtml}${dateSections}</div>`;
         }).join('');
       }
       notice.style.display = 'none';
@@ -948,7 +1139,6 @@
           // Show admin buttons for admin users
           if (user.role === 'admin') {
             document.getElementById('adminScraping').style.display = 'inline-block';
-            document.getElementById('adminUsers').style.display = 'inline-block';
           }
           
           console.log('User logged in successfully:', user.email);
@@ -1168,7 +1358,6 @@
     document.getElementById('preferencesBtn').addEventListener('click', openPreferences);
     document.getElementById('manageFavoritesGlobal').addEventListener('click', openManageFavoritesGlobal);
     document.getElementById('adminScraping').addEventListener('click', () => window.location.href = '/admin-scraping.html');
-    document.getElementById('adminUsers').addEventListener('click', () => window.location.href = '/admin-users.html');
     
     // Close modal when clicking outside
     document.getElementById('preferencesModal').addEventListener('click', (e) => {

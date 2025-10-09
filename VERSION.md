@@ -1,5 +1,38 @@
 # Version History
 
+## Version 2.1.0 - October 2025 (STABLE)
+
+### 🎉 New Features
+- **Unified Admin Panel** - Consolidated all admin functions into one interface
+- **Park Alerts System** - Real-time park closure and restriction notifications
+- **Enhanced User Management** - Integrated user management within admin panel
+- **Improved Alert Parsing** - Better detection of park safety alerts and restrictions
+
+### 🏗️ Technical Improvements
+- **Enhanced Park Alerts Scraping** - Improved parsing for multiple park formats
+- **Modal-based Admin Functions** - Clean UI for secondary admin operations
+- **API-level Authentication** - More secure admin verification
+- **Flexible HTML Parsing** - Support for various park website structures
+
+### 🐛 Bug Fixes
+- Fixed park alerts not capturing Silverwood Lake SRA safety information
+- Resolved admin alerts page authentication issues
+- Fixed inconsistent button styling in admin interface
+- Improved error handling for park alerts scraping
+
+### 📊 Park Alerts Coverage
+- **17 parks** with website URL monitoring
+- **3 parks** with active alerts (Anza-Borrego, Point Mugu, Silverwood Lake)
+- **7 total alerts** including critical safety information
+- **Alert types**: Critical (1), Warning (5), Info (1)
+
+### 🎯 New Park Alerts
+- **Silverwood Lake SRA**: Bear activity warnings, Golden mussel restrictions, Water quality info
+- **Anza-Borrego Desert SP**: Seasonal facility closures
+- **Point Mugu SP**: Beach closure for munitions cleanup
+
+---
+
 ## Version 2.0.0 - October 2025 (STABLE)
 
 ### 🎉 Major Features
@@ -89,12 +122,18 @@
 
 ## Roadmap
 
-### Version 2.1.0 (Planned)
+### Version 2.1.0 (COMPLETED ✅)
+- **Unified Admin Panel** - Consolidated all admin functions into one interface
+- **Park Alerts System** - Real-time park closure and restriction notifications
+- **Enhanced User Management** - Integrated user management within admin panel
+- **Improved Alert Parsing** - Better detection of park safety alerts and restrictions
+
+### Version 2.2.0 (Planned)
 - **Email notifications** for weekend availability alerts
 - **Scheduled monitoring** with cron job automation
 - **Advanced filtering** options for users
-- **Mobile app** development
-- **Analytics dashboard** for usage statistics
+- **Alert management** interface for admins
+- **Generic park parsing** for all park formats
 
 ### Version 3.0.0 (Future)
 - **Multi-state support** beyond California
@@ -107,7 +146,7 @@
 
 **Current Status**: ✅ **STABLE** - Ready for production deployment
 
-**Last Updated**: October 2025
+**Last Updated**: October 9, 2025
 
 **Maintainer**: CampsiteAgent Development Team
 

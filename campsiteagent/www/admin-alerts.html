@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Park Alerts - CampsiteAgent</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: #4c51bf;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .back-btn {
+            background: #e2e8f0;
+            color: #4a5568;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .back-btn:hover {
+            background: #cbd5e0;
+        }
+
+        .logout-btn {
+            background: #e53e3e;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            display: none;
+            cursor: pointer;
+        }
+
+        .logout-btn:hover {
+            background: #c53030;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+
+        .alert-card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border-left: 4px solid;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .alert-card.alert-critical {
+            border-left-color: #dc2626;
+            background: #fef2f2;
+        }
+
+        .alert-card.alert-warning {
+            border-left-color: #d97706;
+            background: #fffbeb;
+        }
+
+        .alert-card.alert-info {
+            border-left-color: #2563eb;
+            background: #eff6ff;
+        }
+
+        .alert-header {
+            display: flex;
+            justify-content: between;
+            align-items: flex-start;
+            margin-bottom: 0.5rem;
+        }
+
+        .alert-title {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .alert-meta {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.9rem;
+            color: #6b7280;
+            margin-bottom: 0.5rem;
+        }
+
+        .alert-description {
+            color: #4b5563;
+            line-height: 1.5;
+        }
+
+        .alert-icon {
+            font-size: 1.2rem;
+            margin-right: 0.5rem;
+        }
+
+        .park-name {
+            font-weight: 600;
+            color: #4c51bf;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: #f8fafc;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #4c51bf;
+        }
+
+        .stat-label {
+            color: #6b7280;
+            font-size: 0.9rem;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #6b7280;
+        }
+
+        .error {
+            background: #fef2f2;
+            color: #dc2626;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid #fecaca;
+            margin-bottom: 1rem;
+        }
+
+        .refresh-btn {
+            background: #4c51bf;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .refresh-btn:hover {
+            background: #434190;
+        }
+
+        .refresh-btn:disabled {
+            background: #a0aec0;
+            cursor: not-allowed;
+        }
+
+        .no-alerts {
+            text-align: center;
+            padding: 3rem;
+            color: #6b7280;
+        }
+
+        .no-alerts h3 {
+            margin-bottom: 0.5rem;
+            color: #4a5568;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚨 Park Alerts Admin</h1>
+        <div class="header-actions">
+            <a href="/admin-scraping.html" class="back-btn">← Admin Panel</a>
+            <button id="logoutBtn" class="logout-btn">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h2 style="color: #4c51bf; margin: 0;">📊 Park Alerts Overview</h2>
+                <button id="refreshBtn" class="refresh-btn">🔄 Refresh</button>
+            </div>
+            
+            <div id="statsContainer" class="stats-grid">
+                <div class="loading">Loading statistics...</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 style="color: #4c51bf; margin-bottom: 1.5rem;">🚨 All Park Alerts</h2>
+            <div id="alertsContainer">
+                <div class="loading">Loading alerts...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Check authentication
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/me', { credentials: 'same-origin' });
+                const data = await res.json();
+                
+                console.log('Auth response:', data); // Debug log
+                
+                if (data.authenticated) {
+                    // Try to load alerts - the API will handle admin check
+                    document.getElementById('logoutBtn').style.display = 'block';
+                    loadAlerts();
+                } else {
+                    showAuthError('You must be logged in to access this page.');
+                }
+            } catch (e) {
+                console.error('Auth error:', e);
+                showAuthError('Authentication error: ' + e.message);
+            }
+        }
+
+        function showAuthError(message) {
+            document.body.innerHTML = `
+                <div class="header">
+                    <h1>🚨 Park Alerts Admin</h1>
+                </div>
+                <div class="container">
+                    <div class="card">
+                        <h2>🔒 Admin Access Required</h2>
+                        <p>${message}</p>
+                        <a href="/login.html" class="back-btn">Login</a>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function loadAlerts() {
+            const statsContainer = document.getElementById('statsContainer');
+            const alertsContainer = document.getElementById('alertsContainer');
+            
+            try {
+                const res = await fetch('/api/admin/park-alerts', { credentials: 'same-origin' });
+                
+                if (!res.ok) {
+                    if (res.status === 401 || res.status === 403) {
+                        showAuthError('You must be logged in as an admin to access this page.');
+                        return;
+                    }
+                    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                }
+                
+                const data = await res.json();
+                
+                // Check for error in response
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                // Render statistics
+                renderStats(data.stats);
+                
+                // Render alerts
+                if (data.alerts && data.alerts.length > 0) {
+                    renderAlerts(data.alerts);
+                } else {
+                    alertsContainer.innerHTML = `
+                        <div class="no-alerts">
+                            <h3>No alerts found</h3>
+                            <p>No park alerts have been scraped yet. Use the "Scrape Park Alerts" button in the admin panel to get started.</p>
+                        </div>
+                    `;
+                }
+                
+            } catch (e) {
+                console.error('Load alerts error:', e);
+                statsContainer.innerHTML = `
+                    <div class="error">
+                        <strong>Error loading alerts:</strong> ${e.message}
+                    </div>
+                `;
+                alertsContainer.innerHTML = `
+                    <div class="error">
+                        <strong>Error loading alerts:</strong> ${e.message}
+                    </div>
+                `;
+            }
+        }
+
+        function renderStats(stats) {
+            const statsContainer = document.getElementById('statsContainer');
+            
+            statsContainer.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-number">${stats.total_alerts || 0}</div>
+                    <div class="stat-label">Total Alerts</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.active_alerts || 0}</div>
+                    <div class="stat-label">Active Alerts</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.critical_alerts || 0}</div>
+                    <div class="stat-label">Critical</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.warning_alerts || 0}</div>
+                    <div class="stat-label">Warning</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.info_alerts || 0}</div>
+                    <div class="stat-label">Info</div>
+                </div>
+            `;
+        }
+
+        function renderAlerts(alerts) {
+            const alertsContainer = document.getElementById('alertsContainer');
+            
+            // Group alerts by park
+            const alertsByPark = {};
+            alerts.forEach(alert => {
+                if (!alertsByPark[alert.park_name]) {
+                    alertsByPark[alert.park_name] = [];
+                }
+                alertsByPark[alert.park_name].push(alert);
+            });
+            
+            let html = '';
+            for (const [parkName, parkAlerts] of Object.entries(alertsByPark)) {
+                html += `<div class="park-name">🏞️ ${parkName}</div>`;
+                
+                parkAlerts.forEach(alert => {
+                    const icon = alert.severity === 'critical' ? '🚨' : 
+                                alert.severity === 'warning' ? '⚠️' : 'ℹ️';
+                    
+                    const createdDate = new Date(alert.created_at).toLocaleDateString();
+                    const scrapedDate = new Date(alert.scraped_at).toLocaleDateString();
+                    
+                    html += `
+                        <div class="alert-card alert-${alert.severity}">
+                            <div class="alert-header">
+                                <div>
+                                    <div class="alert-title">
+                                        <span class="alert-icon">${icon}</span>
+                                        ${alert.title}
+                                    </div>
+                                    <div class="alert-meta">
+                                        <span><strong>Type:</strong> ${alert.alert_type}</span>
+                                        <span><strong>Severity:</strong> ${alert.severity}</span>
+                                        <span><strong>Created:</strong> ${createdDate}</span>
+                                        <span><strong>Scraped:</strong> ${scrapedDate}</span>
+                                    </div>
+                                    ${alert.description ? `<div class="alert-description">${alert.description}</div>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            
+            alertsContainer.innerHTML = html;
+        }
+
+        // Event listeners
+        document.getElementById('refreshBtn').addEventListener('click', () => {
+            const btn = document.getElementById('refreshBtn');
+            btn.disabled = true;
+            btn.textContent = '🔄 Refreshing...';
+            
+            loadAlerts().finally(() => {
+                btn.disabled = false;
+                btn.textContent = '🔄 Refresh';
+            });
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            try {
+                await fetch('/api/logout', { method: 'POST' });
+                window.location.href = '/landing.html';
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        });
+
+        // Initialize
+        checkAuth();
+    </script>
+</body>
+</html>

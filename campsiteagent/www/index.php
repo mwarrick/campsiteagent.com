@@ -268,12 +268,8 @@ if ($method === 'GET' && $uri === '/api/availability/latest') {
     $sortBy = 'date';
     $sortDir = 'ASC';
 
-    // For "All parks" queries, use park ID ordering to ensure fair distribution across parks
-    if (!$parkId) {
-        $order = ' ORDER BY p.id, a.date ASC, s.site_number ASC';
-    } else {
-        $order = ' ORDER BY p.name, a.date ASC, s.site_number ASC';
-    }
+    // Order parks alphabetically, then by date and site number
+    $order = ' ORDER BY p.name ASC, a.date ASC, s.site_number ASC';
 
     $wherePark = $parkId ? ' AND p.id = :parkId' : '';
     
@@ -296,7 +292,7 @@ if ($method === 'GET' && $uri === '/api/availability/latest') {
             JOIN sites s ON s.park_id = p.id
             LEFT JOIN facilities f ON s.facility_id = f.id
             JOIN site_availability a ON a.site_id = s.id
-            WHERE a.is_available = 1 AND a.date >= CURDATE()' . $wherePark . $whereDateRange . $order;
+            WHERE a.is_available = 1 AND a.date >= CURDATE() AND (f.active IS NULL OR f.active = 1)' . $wherePark . $whereDateRange . $order;
     $stmt = $pdo->prepare($sql);
     if ($parkId) { $stmt->bindValue(':parkId', $parkId, PDO::PARAM_INT); }
     if ($maxDate) { $stmt->bindValue(':maxDate', $maxDate, PDO::PARAM_STR); }
@@ -395,6 +391,48 @@ if ($method === 'GET' && $uri === '/api/availability/latest') {
                 'sites' => [$item['site']]
             ];
         }
+    }
+    
+    // Add park alerts to the response
+    $parkIds = array_unique(array_column($out, 'park_id'));
+    $parkIds = array_filter($parkIds); // Remove null values
+    
+    $alerts = [];
+    if (!empty($parkIds)) {
+        try {
+            // Check if ParkAlertRepository class exists and table exists
+            if (class_exists('\CampsiteAgent\Repositories\ParkAlertRepository')) {
+                // Check if park_alerts table exists
+                $stmt = $pdo->query("SHOW TABLES LIKE 'park_alerts'");
+                if ($stmt->rowCount() > 0) {
+                    $alertRepo = new \CampsiteAgent\Repositories\ParkAlertRepository($pdo);
+                    $parkAlerts = $alertRepo->getActiveAlertsForParks($parkIds);
+                    
+                    // Group alerts by park_id
+                    foreach ($parkAlerts as $alert) {
+                        $alerts[$alert['park_id']][] = [
+                            'type' => $alert['alert_type'],
+                            'severity' => $alert['severity'],
+                            'title' => $alert['title'],
+                            'description' => $alert['description'],
+                            'effective_date' => $alert['effective_date'],
+                            'expiration_date' => $alert['expiration_date']
+                        ];
+                    }
+                } else {
+                    error_log("park_alerts table not found - skipping alerts");
+                }
+            } else {
+                error_log("ParkAlertRepository class not found - skipping alerts");
+            }
+        } catch (Exception $e) {
+            error_log("Error loading park alerts: " . $e->getMessage());
+        }
+    }
+    
+    // Add alerts to each park in the response
+    foreach ($out as &$park) {
+        $park['alerts'] = $alerts[$park['park_id']] ?? [];
     }
     
     json(200, ['data' => $out, 'page' => $page, 'pageSize' => $pageSize, 'total' => $totalSites]);
@@ -1404,6 +1442,126 @@ if ($method === 'PUT' && preg_match('#^/api/admin/parks/(\d+)/website-url$#', $u
         
     } catch (\Throwable $e) {
         json(500, ['error' => 'Failed to update park website URL: ' . $e->getMessage()]);
+    }
+}
+
+// Admin: Get all park alerts
+if ($method === 'GET' && $uri === '/api/admin/park-alerts') {
+    header('Content-Type: application/json');
+    $uid = requireAuth();
+    requireAdmin($uid);
+    
+    try {
+        // Check if ParkAlertRepository class exists
+        if (!class_exists('\CampsiteAgent\Repositories\ParkAlertRepository')) {
+            json(400, ['error' => 'Park alerts system not available - ParkAlertRepository class not found']);
+        }
+        
+        // Check if park_alerts table exists
+        $pdo = Database::getConnection();
+        $stmt = $pdo->query("SHOW TABLES LIKE 'park_alerts'");
+        if ($stmt->rowCount() === 0) {
+            json(400, ['error' => 'Park alerts system not available - park_alerts table not found']);
+        }
+        
+        // Manually include the required class
+        $repoPath = __DIR__ . '/../app/src/Repositories/ParkAlertRepository.php';
+        if (!file_exists($repoPath)) {
+            json(400, ['error' => 'ParkAlertRepository.php file not found']);
+        }
+        
+        require_once $repoPath;
+        $alertRepository = new \CampsiteAgent\Repositories\ParkAlertRepository($pdo);
+        
+        // Get all active alerts with park information
+        $sql = 'SELECT 
+                    pa.*,
+                    p.name as park_name
+                FROM park_alerts pa
+                JOIN parks p ON pa.park_id = p.id
+                WHERE pa.is_active = 1
+                ORDER BY p.name ASC, pa.severity DESC, pa.created_at DESC';
+        
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute();
+        $alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Get alert statistics
+        $stats = $alertRepository->getAlertStats();
+        
+        json(200, [
+            'alerts' => $alerts,
+            'stats' => $stats
+        ]);
+        
+    } catch (Exception $e) {
+        error_log("Error loading park alerts: " . $e->getMessage());
+        json(500, ['error' => 'Failed to load park alerts: ' . $e->getMessage()]);
+    }
+}
+
+// Admin: Scrape park alerts
+if ($method === 'POST' && $uri === '/api/admin/scrape-park-alerts') {
+    header('Content-Type: application/json');
+    $uid = requireAuth();
+    requireAdmin($uid);
+    
+    try {
+        // Check if ParkAlertRepository class exists
+        if (!class_exists('\CampsiteAgent\Repositories\ParkAlertRepository')) {
+            error_log("ParkAlertRepository class not found");
+            json(400, ['error' => 'Park alerts system not available - ParkAlertRepository class not found. Please deploy the park alerts system files.']);
+        }
+        
+        // Check if park_alerts table exists
+        $pdo = Database::getConnection();
+        $stmt = $pdo->query("SHOW TABLES LIKE 'park_alerts'");
+        if ($stmt->rowCount() === 0) {
+            error_log("park_alerts table not found");
+            json(400, ['error' => 'Park alerts system not available - park_alerts table not found. Please run migration 020 first.']);
+        }
+        
+        // Manually include the required classes
+        $repoPath = __DIR__ . '/../app/src/Repositories/ParkAlertRepository.php';
+        $servicePath = __DIR__ . '/../app/src/Services/ParkAlertScraperService.php';
+        
+        if (!file_exists($repoPath)) {
+            error_log("ParkAlertRepository.php file not found at: " . $repoPath);
+            json(400, ['error' => 'ParkAlertRepository.php file not found. Please deploy the park alerts system files.']);
+        }
+        
+        if (!file_exists($servicePath)) {
+            error_log("ParkAlertScraperService.php file not found at: " . $servicePath);
+            json(400, ['error' => 'ParkAlertScraperService.php file not found. Please deploy the park alerts system files.']);
+        }
+        
+        require_once $repoPath;
+        require_once $servicePath;
+        
+        $alertRepository = new \CampsiteAgent\Repositories\ParkAlertRepository($pdo);
+        $httpClient = new \CampsiteAgent\Infrastructure\HttpClient();
+        $scraperService = new \CampsiteAgent\Services\ParkAlertScraperService($alertRepository, $httpClient);
+        
+        // Scrape alerts for all parks
+        $results = $scraperService->scrapeAllParkAlerts();
+        
+        // Get alert statistics
+        $stats = $alertRepository->getAlertStats();
+        
+        json(200, [
+            'message' => 'Park alerts scraping completed successfully',
+            'results' => $results,
+            'stats' => $stats
+        ]);
+        
+    } catch (Exception $e) {
+        error_log("Error in park alerts scraping: " . $e->getMessage());
+        error_log("Stack trace: " . $e->getTraceAsString());
+        json(500, ['error' => 'Failed to scrape park alerts: ' . $e->getMessage()]);
+    } catch (Error $e) {
+        error_log("Fatal error in park alerts scraping: " . $e->getMessage());
+        error_log("Stack trace: " . $e->getTraceAsString());
+        json(500, ['error' => 'Fatal error: ' . $e->getMessage()]);
     }
 }
 

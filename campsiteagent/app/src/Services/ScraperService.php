@@ -108,17 +108,27 @@ class ScraperService
                 $latestDate = null;
 
                 foreach ($siteEntries as $s) {
+                    // Validate facility_db_id before creating site
+                    $facilityDbId = $s['facility_db_id'] ?? null;
+                    if ($facilityDbId === null) {
+                        error_log("ScraperService: Skipping site {$s['site_number']} in park {$park['name']} - no facility_db_id");
+                        continue;
+                    }
+                    
                     // Upsert site with all metadata
                     $siteId = $this->sites->upsertSite(
                         (int)$park['id'], 
                         $s['site_number'], 
                         $s['site_type'] ?? null,
                         [], // attributes_json (for future use)
-                        $s['facility_db_id'] ?? null, // facility_id (our DB ID)
+                        $facilityDbId, // facility_id (our DB ID)
                         $s['site_name'] ?? null,
                         $s['unit_type_id'] ?? null,
                         $s['is_ada'] ?? false,
-                        $s['vehicle_length'] ?? 0
+                        $s['vehicle_length'] ?? 0,
+                        $s['site_number'], // external_site_id (API site number)
+                        $s['unit_type_id'] ? (string)$s['unit_type_id'] : null, // external_unit_type_id
+                        $s['facility_id'] // external_facility_id (API facility ID)
                     );
                     
                     foreach ($s['dates'] as $date => $avail) {
@@ -164,16 +174,26 @@ class ScraperService
                         $totalReconciled = 0;
                         // For each site we just processed, compute its now-available dates and reconcile
                         foreach ($siteEntries as $se) {
+                            // Validate facility_db_id before creating site
+                            $facilityDbId = $se['facility_db_id'] ?? null;
+                            if ($facilityDbId === null) {
+                                error_log("ScraperService: Skipping reconciliation for site {$se['site_number']} in park {$park['name']} - no facility_db_id");
+                                continue;
+                            }
+                            
                             $siteIdForRecon = $this->sites->upsertSite(
                                 (int)$park['id'],
                                 $se['site_number'],
                                 $se['site_type'] ?? null,
                                 [],
-                                $se['facility_db_id'] ?? null,
+                                $facilityDbId,
                                 $se['site_name'] ?? null,
                                 $se['unit_type_id'] ?? null,
                                 $se['is_ada'] ?? false,
-                                $se['vehicle_length'] ?? 0
+                                $se['vehicle_length'] ?? 0,
+                                $se['site_number'], // external_site_id (API site number)
+                                $se['unit_type_id'] ? (string)$se['unit_type_id'] : null, // external_unit_type_id
+                                $se['facility_id'] // external_facility_id (API facility ID)
                             );
                             // Build list of available dates from the latest scrape for this site
                             $nowAvailable = [];
@@ -284,11 +304,31 @@ class ScraperService
         
         // Create facility mapper to save facilities and return DB IDs
         $facilityMapper = function($facilityId, $facilityName) use ($parkId) {
-            return $this->facilities->upsertFacility(
-                $parkId,
-                $facilityName,
-                $facilityId
-            );
+            // Validate inputs
+            if (empty($facilityName)) {
+                error_log("ScraperService: Empty facility name for facility_id: " . ($facilityId ?: 'null'));
+                return null;
+            }
+            
+            try {
+                $dbId = $this->facilities->upsertFacility(
+                    $parkId,
+                    $facilityName,
+                    $facilityId,
+                    null, // description
+                    $facilityId // external_facility_id (same as facility_id for now)
+                );
+                
+                if ($dbId === null || $dbId <= 0) {
+                    error_log("ScraperService: upsertFacility returned invalid ID for facility: {$facilityName} (ID: {$facilityId})");
+                    return null;
+                }
+                
+                return $dbId;
+            } catch (Exception $e) {
+                error_log("ScraperService: Failed to upsert facility {$facilityName} (ID: {$facilityId}): " . $e->getMessage());
+                return null;
+            }
         };
         
         $entries = [];

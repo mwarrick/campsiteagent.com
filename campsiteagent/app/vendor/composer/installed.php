@@ -1,9 +1,9 @@
 <?php return array(
     'root' => array(
         'name' => 'campsiteagent/app',
-        'pretty_version' => 'dev-main',
-        'version' => 'dev-main',
-        'reference' => '8f16cec3137e573306f59c4198c861a687e33e1e',
+        'pretty_version' => '2.3.1',
+        'version' => '2.3.1.0',
+        'reference' => null,
         'type' => 'project',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -11,9 +11,9 @@
     ),
     'versions' => array(
         'campsiteagent/app' => array(
-            'pretty_version' => 'dev-main',
-            'version' => 'dev-main',
-            'reference' => '8f16cec3137e573306f59c4198c861a687e33e1e',
+            'pretty_version' => '2.3.1',
+            'version' => '2.3.1.0',
+            'reference' => null,
             'type' => 'project',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),

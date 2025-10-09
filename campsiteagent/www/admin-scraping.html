@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Scraping - CampsiteAgent</title>
+    <title>Admin Panel - CampsiteAgent</title>
     <style>
         * {
             margin: 0;
@@ -115,11 +115,28 @@
             height: 18px;
         }
 
-        .action-buttons {
+        .admin-section {
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background: white;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .admin-section h3 {
+            margin: 0 0 1rem 0;
+            color: #4c51bf;
+            font-size: 1.1rem;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .button-row {
             display: flex;
             gap: 1rem;
+            flex-wrap: wrap;
             justify-content: center;
-            margin-top: 2rem;
         }
 
         button {
@@ -527,10 +544,9 @@
 </head>
 <body>
     <div class="header">
-        <h1>🔧 Admin Scraping Control</h1>
+        <h1>🔧 Admin Panel</h1>
         <div class="header-actions">
             <span id="userInfo" style="display: none;"></span>
-            <a href="/admin-users.html" class="back-btn">👥 User Management</a>
             <a href="/dashboard.html" class="back-btn">← Back to Dashboard</a>
             <button id="logoutBtn" style="background: #e53e3e; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; display: none;">Logout</button>
         </div>
@@ -543,10 +559,48 @@
         </div>
 
         <div id="adminContent" style="display: none;">
-            <div class="card">
-                <h2 style="margin-bottom: 1.5rem; color: #4c51bf;">🎯 Scraping Configuration</h2>
-                
-                <div class="scraping-controls">
+
+                <!-- Parks Section -->
+                <div class="admin-section">
+                    <h3>🏞️ Parks</h3>
+                    <div class="button-row">
+                        <button id="manageParks" class="btn-secondary">Manage Parks</button>
+                        <button id="scrapeParkAlerts" class="btn-secondary">🚨 Scrape Park Alerts</button>
+                        <a href="/admin-alerts.html" class="btn-secondary" style="text-decoration: none; display: inline-flex; align-items: center; justify-content: center; padding: 1rem 2rem; border: none; border-radius: 8px; font-weight: 500; transition: all 0.2s; background: #e2e8f0; color: #4a5568;">📋 View All Alerts</a>
+                    </div>
+                </div>
+
+                <!-- Facilities Section -->
+                <div class="admin-section">
+                    <h3>🏕️ Facilities</h3>
+                    <div class="button-row">
+                        <button id="manageFacilities" class="btn-success">⚙️ Manage Facilities</button>
+                        <button id="syncFacilities" class="btn-secondary">🏕️ Sync Facilities</button>
+                    </div>
+                </div>
+
+                <!-- Data Section -->
+                <div class="admin-section">
+                    <h3>📊 Data</h3>
+                    <div class="button-row">
+                        <button id="purgeOldData" class="btn-danger">🗑️ Purge Old Data</button>
+                        <button id="sendDailyDigest" class="btn-success">✉️ Send Test Digest</button>
+                    </div>
+                </div>
+
+                <!-- User Management Section -->
+                <div class="admin-section">
+                    <h3>👥 User Management</h3>
+                    <div class="button-row">
+                        <button id="manageUsers" class="btn-primary">👥 Manage Users</button>
+                        <button id="refreshUsers" class="btn-secondary">🔄 Refresh Users</button>
+                    </div>
+                </div>
+
+                <!-- Scraping Configuration -->
+                <div class="admin-section">
+                    <h3>⚙️ Scraping Configuration</h3>
+                    
                     <div class="control-group">
                         <label for="parkSelect">Parks to Scrape:</label>
                         <select id="parkSelect" multiple size="8">
@@ -590,16 +644,11 @@
                             <option value="slow">Slow (Gentle on API)</option>
                         </select>
                     </div>
-                </div>
 
-                <div class="action-buttons">
-                    <button id="startScraping" class="btn-primary">🚀 Start Scraping</button>
-                    <button id="stopScraping" class="btn-danger" style="display: none;">⏹️ Stop Scraping</button>
-                    <button id="syncFacilities" class="btn-secondary">🏕️ Sync Facilities</button>
-                    <button id="manageFacilities" class="btn-success">⚙️ Manage Facilities</button>
-                    <button id="manageParks" class="btn-secondary">🏞️ Manage Parks</button>
-                    <button id="sendDailyDigest" class="btn-success">✉️ Send Test Digest</button>
-                    <button id="purgeOldData" class="btn-danger">🗑️ Purge Old Data</button>
+                    <div class="button-row" style="margin-top: 2rem;">
+                        <button id="startScraping" class="btn-primary">🚀 Start Scraping</button>
+                        <button id="stopScraping" class="btn-danger" style="display: none;">⏹️ Stop Scraping</button>
+                    </div>
                 </div>
             </div>
 
@@ -664,6 +713,22 @@
                     <button id="addParkBtn" class="btn-success" style="padding:.5rem 1rem;">Add Park</button>
                 </div>
                 <div id="parksList" class="facilities-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Management Modal -->
+    <div id="usersModal" class="modal-overlay" aria-hidden="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="usersTitle">
+            <div class="modal-header">
+                <h3 id="usersTitle">👥 User Management</h3>
+                <button id="closeUsers" class="btn-link" aria-label="Close">✖</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-actions">
+                    <button id="refreshUsersBtn" class="btn-secondary">🔄 Refresh</button>
+                </div>
+                <div id="usersList" class="facilities-list"></div>
             </div>
         </div>
     </div>
@@ -912,6 +977,78 @@
             }
         }
 
+        // Scrape park alerts
+        async function scrapeParkAlerts() {
+            const btn = document.getElementById('scrapeParkAlerts');
+            const originalText = btn.textContent;
+            
+            btn.disabled = true;
+            btn.textContent = '🚨 Scraping...';
+            
+            try {
+                const res = await fetchWithAuth('/api/admin/scrape-park-alerts', { method: 'POST' });
+                
+                // Check if response is ok
+                if (!res.ok) {
+                    const errorText = await res.text();
+                    let errorMessage = `HTTP ${res.status}: ${res.statusText}`;
+                    
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        errorMessage = errorData.error || errorMessage;
+                    } catch (parseError) {
+                        errorMessage = errorText || errorMessage;
+                    }
+                    
+                    alert('❌ Error: ' + errorMessage);
+                    return;
+                }
+                
+                // Try to parse JSON response
+                let data;
+                try {
+                    const responseText = await res.text();
+                    if (!responseText.trim()) {
+                        throw new Error('Empty response from server');
+                    }
+                    data = JSON.parse(responseText);
+                } catch (parseError) {
+                    alert('❌ Error: Invalid response from server. The park alerts system may not be properly deployed.');
+                    console.error('JSON parse error:', parseError);
+                    return;
+                }
+                
+                // Success case
+                let message = `✅ Park alerts scraping completed!\n\n`;
+                if (data.results && Object.keys(data.results).length > 0) {
+                    message += `Results:\n`;
+                    for (const [parkName, alertCount] of Object.entries(data.results)) {
+                        message += `• ${parkName}: ${alertCount} alerts\n`;
+                    }
+                } else {
+                    message += `No alerts found for any parks.`;
+                }
+                
+                if (data.stats) {
+                    message += `\nDatabase Stats:\n`;
+                    message += `• Total alerts: ${data.stats.total_alerts}\n`;
+                    message += `• Active alerts: ${data.stats.active_alerts}\n`;
+                    message += `• Critical: ${data.stats.critical_alerts}\n`;
+                    message += `• Warning: ${data.stats.warning_alerts}\n`;
+                    message += `• Info: ${data.stats.info_alerts}`;
+                }
+                
+                alert(message);
+                
+            } catch (e) {
+                alert('❌ Network Error: ' + e.message);
+                console.error('Network error:', e);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        }
+
         // Facilities Manager
         function openFacilitiesModal() {
             const overlay = document.getElementById('facilitiesModal');
@@ -1052,8 +1189,11 @@
         document.getElementById('startScraping').addEventListener('click', startScraping);
         document.getElementById('stopScraping').addEventListener('click', stopScraping);
         document.getElementById('syncFacilities').addEventListener('click', syncFacilities);
+        document.getElementById('scrapeParkAlerts').addEventListener('click', scrapeParkAlerts);
         document.getElementById('manageFacilities').addEventListener('click', manageFacilities);
         document.getElementById('manageParks').addEventListener('click', () => openParksModal());
+        document.getElementById('manageUsers').addEventListener('click', () => openUsersModal());
+        document.getElementById('refreshUsers').addEventListener('click', () => openUsersModal());
         document.getElementById('sendDailyDigest').addEventListener('click', async (e) => {
             const btn = e.currentTarget;
             if (btn.disabled) return;
@@ -1160,6 +1300,19 @@
         }
         document.getElementById('closeParks').addEventListener('click', closeParksModal);
         document.getElementById('parksModal').addEventListener('click', (e) => { if (e.target.id === 'parksModal') closeParksModal(); });
+
+        // User Management functions
+        function openUsersModal() {
+            const overlay = document.getElementById('usersModal');
+            overlay.style.display = 'flex';
+            renderUsersList();
+        }
+        function closeUsersModal() {
+            document.getElementById('usersModal').style.display = 'none';
+        }
+        document.getElementById('closeUsers').addEventListener('click', closeUsersModal);
+        document.getElementById('usersModal').addEventListener('click', (e) => { if (e.target.id === 'usersModal') closeUsersModal(); });
+        document.getElementById('refreshUsersBtn').addEventListener('click', renderUsersList);
         async function renderParksList() {
             const container = document.getElementById('parksList');
             container.innerHTML = '<div style="padding:1rem; color:#718096;">Loading parks...</div>';
@@ -1314,6 +1467,67 @@
             } catch (e) {
                 container.innerHTML = '<div style="padding:1rem; color:#e53e3e;">Error loading parks.</div>';
             }
+        }
+
+        async function renderUsersList() {
+            const container = document.getElementById('usersList');
+            container.innerHTML = '<div style="padding:1rem; color:#718096;">Loading users...</div>';
+            try {
+                const res = await fetch('/api/admin/users', { credentials: 'same-origin' });
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                }
+                const data = await res.json();
+                const users = (data.users || []).sort((a,b) => a.email.localeCompare(b.email));
+                container.innerHTML = '';
+                users.forEach(user => {
+                    const row = document.createElement('div');
+                    row.className = 'facility-row';
+                    row.style.flexDirection = 'column';
+                    row.style.alignItems = 'flex-start';
+                    row.style.gap = '8px';
+                    
+                    // User info section
+                    const userInfo = document.createElement('div');
+                    userInfo.style.width = '100%';
+                    userInfo.innerHTML = `
+                        <div style="font-weight:600; margin-bottom:4px;">${user.email}</div>
+                        <div style="color:#718096; font-size:.85rem; margin-bottom:8px;">
+                            ID: ${user.id} • Role: ${user.role || 'user'} • ${user.email_verified ? 'Verified' : 'Unverified'} • 
+                            Created: ${new Date(user.created_at).toLocaleDateString()}
+                        </div>
+                    `;
+                    
+                    // Actions section
+                    const actionsSection = document.createElement('div');
+                    actionsSection.style.width = '100%';
+                    actionsSection.style.display = 'flex';
+                    actionsSection.style.alignItems = 'center';
+                    actionsSection.style.gap = '8px';
+                    actionsSection.innerHTML = `
+                        <button class="btn btn-sm btn-primary" onclick="editUser(${user.id})">
+                            ✏️ Edit
+                        </button>
+                        <span style="color:#718096; font-size:.8rem;">
+                            ${user.role === 'admin' ? '🔑 Admin' : '👤 User'}
+                        </span>
+                    `;
+                    
+                    row.appendChild(userInfo);
+                    row.appendChild(actionsSection);
+                    container.appendChild(row);
+                });
+                if (users.length === 0) {
+                    container.innerHTML = '<div style="padding:1rem; color:#718096;">No users found.</div>';
+                }
+            } catch (e) {
+                container.innerHTML = '<div style="padding:1rem; color:#e53e3e;">Error loading users: ' + e.message + '</div>';
+            }
+        }
+
+        function editUser(userId) {
+            // For now, just show an alert - this could be expanded to a full edit modal
+            alert('User editing functionality would be implemented here. User ID: ' + userId);
         }
         document.getElementById('addParkBtn').addEventListener('click', async () => {
             const name = (document.getElementById('newParkName').value||'').trim();

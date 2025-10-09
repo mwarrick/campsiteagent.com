@@ -35,8 +35,8 @@ class RunRepository
 
     public function createDailyRun(array $config): int
     {
-        $stmt = $this->pdo->prepare('INSERT INTO availability_runs (park_id, started_at, status) VALUES (NULL, NOW(), "running")');
-        $stmt->execute();
+        $stmt = $this->pdo->prepare('INSERT INTO availability_runs (park_id, started_at, status, configuration) VALUES (NULL, NOW(), "running", :config)');
+        $stmt->execute([':config' => json_encode($config)]);
         return (int)$this->pdo->lastInsertId();
     }
 
