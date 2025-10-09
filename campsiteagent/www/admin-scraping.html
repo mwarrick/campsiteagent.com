@@ -636,7 +636,6 @@
                     <h3>👥 User Management</h3>
                     <div class="button-row">
                         <button id="manageUsers" class="btn-primary">👥 Manage Users</button>
-                        <button id="refreshUsers" class="btn-secondary">🔄 Reload User List</button>
                     </div>
                 </div>
 
@@ -768,9 +767,6 @@
                 <button id="closeUsers" class="btn-link" aria-label="Close">✖</button>
             </div>
             <div class="modal-body">
-                <div class="modal-actions">
-                    <button id="refreshUsersBtn" class="btn-secondary">🔄 Reload User List</button>
-                </div>
                 <div id="usersList" class="facilities-list"></div>
             </div>
         </div>
@@ -1278,7 +1274,6 @@
         document.getElementById('manageFacilities').addEventListener('click', manageFacilities);
         document.getElementById('manageParks').addEventListener('click', () => openParksModal());
         document.getElementById('manageUsers').addEventListener('click', () => openUsersModal());
-        document.getElementById('refreshUsers').addEventListener('click', () => openUsersModal());
         document.getElementById('sendDailyDigest').addEventListener('click', async (e) => {
             const btn = e.currentTarget;
             if (btn.disabled) return;
@@ -1397,7 +1392,6 @@
         }
         document.getElementById('closeUsers').addEventListener('click', closeUsersModal);
         document.getElementById('usersModal').addEventListener('click', (e) => { if (e.target.id === 'usersModal') closeUsersModal(); });
-        document.getElementById('refreshUsersBtn').addEventListener('click', renderUsersList);
         
         // Edit user modal event listeners
         document.getElementById('closeEditUser').addEventListener('click', closeEditUserModal);
