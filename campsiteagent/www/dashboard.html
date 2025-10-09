@@ -431,6 +431,16 @@
       const dateRange = getDateRangeText(availabilityDate);
       console.log('Date range calculated:', dateRange);
       
+      // Determine if this is a weekend (2-night) or daily (1-night) listing
+      const isWeekend = availabilityDate.includes(' - ');
+      const dateLabel = isWeekend ? '📅 Date Range to Enter:' : '📅 Start Date to Enter:';
+      const instructionText = isWeekend 
+        ? 'When you click "Continue to ReserveCalifornia.com", make sure to enter the date range above in their booking system.'
+        : 'When you click "Continue to ReserveCalifornia.com", make sure to enter the start date above in their booking system.';
+      const stayInfo = isWeekend 
+        ? 'This represents a 2-night stay (check-in through check-out)'
+        : 'This represents a 1-night stay';
+      
       // Create modal HTML
       const modalHtml = `
         <div id="reserveModal" class="modal show">
@@ -441,14 +451,14 @@
             </div>
             <div style="padding: 0 24px 24px 24px;">
               <div style="color: #4b5563; font-size: 14px; margin-bottom: 16px;">
-                When you click "Continue to ReserveCalifornia.com", make sure to enter the date range above in their booking system.
+                ${instructionText}
               </div>
               <div style="margin-bottom: 16px; padding: 12px; background: #f0f9ff; border-radius: 6px; border-left: 4px solid #0ea5e9;">
-                <div style="font-weight: 600; color: #0c4a6e; margin-bottom: 8px;">📅 Date Range to Enter:</div>
+                <div style="font-weight: 600; color: #0c4a6e; margin-bottom: 8px;">${dateLabel}</div>
                 <div style="font-size: 18px; font-weight: 700; color: #0369a1;">${dateRange}</div>
               </div>
               <div style="margin-bottom: 16px; padding: 12px; background: #fef3c7; border-radius: 6px; border-left: 4px solid #f59e0b;">
-                <div style="color: #92400e; font-size: 14px;">This represents a 2-night stay (check-in through check-out)</div>
+                <div style="color: #92400e; font-size: 14px;">${stayInfo}</div>
               </div>
               <div style="display: flex; gap: 12px; justify-content: flex-end;">
                 <button id="cancelReserve" class="close-btn">Cancel</button>
