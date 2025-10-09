@@ -111,7 +111,7 @@
 
 ## Previous Versions
 
-### Version 1.0.0 - September 2025 (DEPRECATED)
+### Version 1.0.0 - October 2025 (DEPRECATED)
 - Initial prototype with basic functionality
 - Limited park support (San Onofre only)
 - Basic web scraping without real-time updates
