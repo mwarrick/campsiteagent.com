@@ -376,7 +376,7 @@
     let favoriteSiteIds = new Set();
 
     // Function to get readable date range for ReserveCalifornia popup
-    function getDateRangeText(availabilityDate) {
+    function getDateRangeText(availabilityDate, isWeekend) {
       if (!availabilityDate) {
         // Fallback to current date range if no specific date provided
         const today = new Date();
@@ -405,18 +405,23 @@
       // Parse single date format (format: "Fri, Oct 10, 2025")
       const singleDateMatch = availabilityDate.match(/(\w+, \w+ \d+, \d+)/);
       if (singleDateMatch) {
-        // For single date: assume 2-night stay, so show start date through start date + 2 days (3 days total)
-        const dateStr = singleDateMatch[1];
-        const dateMatch = dateStr.match(/(\w+, \w+ \d+), (\d+)/);
-        if (dateMatch) {
-          const startDate = new Date(dateMatch[1] + ', ' + dateMatch[2]);
-          const endDate = new Date(startDate);
-          endDate.setDate(startDate.getDate() + 2); // +2 days for 2-night stay (3 days total)
-          
-          const startFormatted = startDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-          const endFormatted = endDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-          
-          return `${startFormatted}, ${dateMatch[2]} - ${endFormatted}`;
+        if (isWeekend) {
+          // For weekend single date: assume 2-night stay, so show start date through start date + 2 days (3 days total)
+          const dateStr = singleDateMatch[1];
+          const dateMatch = dateStr.match(/(\w+, \w+ \d+), (\d+)/);
+          if (dateMatch) {
+            const startDate = new Date(dateMatch[1] + ', ' + dateMatch[2]);
+            const endDate = new Date(startDate);
+            endDate.setDate(startDate.getDate() + 2); // +2 days for 2-night stay (3 days total)
+            
+            const startFormatted = startDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            const endFormatted = endDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+            
+            return `${startFormatted}, ${dateMatch[2]} - ${endFormatted}`;
+          }
+        } else {
+          // For daily single date: just return the single date (1-night stay)
+          return singleDateMatch[1];
         }
         return singleDateMatch[1];
       }
@@ -428,11 +433,11 @@
     // Function to show ReserveCalifornia modal and open link
     window.openReserveCalifornia = function(url, availabilityDate) {
       console.log('openReserveCalifornia called with:', url, availabilityDate);
-      const dateRange = getDateRangeText(availabilityDate);
-      console.log('Date range calculated:', dateRange);
       
       // Determine if this is a weekend (2-night) or daily (1-night) listing
       const isWeekend = availabilityDate.includes(' - ');
+      const dateRange = getDateRangeText(availabilityDate, isWeekend);
+      console.log('Date range calculated:', dateRange);
       const dateLabel = isWeekend ? '📅 Date Range to Enter:' : '📅 Start Date to Enter:';
       const instructionText = isWeekend 
         ? 'When you click "Continue to ReserveCalifornia.com", make sure to enter the date range above in their booking system.'
