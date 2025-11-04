@@ -131,12 +131,13 @@ class EmailTemplates
                     // If facility external ID present, include it for deeper context (when supported by site)
                     $facilityId = null;
                     foreach ($facilitySites as $s) { if (!empty($s['facility_external_id'])) { $facilityId = (string)$s['facility_external_id']; break; } }
+                    // URL format: https://reservecalifornia.com/park/{parkNumber}/{facilityId}
                     if ($parkNumber && $facilityId) {
-                        $parkUrl = "https://reservecalifornia.com/Web/Default.aspx#!park/" . htmlspecialchars($parkNumber) . "/" . htmlspecialchars($facilityId);
+                        $parkUrl = "https://reservecalifornia.com/park/" . htmlspecialchars($parkNumber) . "/" . htmlspecialchars($facilityId);
                     } elseif ($parkNumber) {
-                        $parkUrl = "https://reservecalifornia.com/Web/Default.aspx#!park/" . htmlspecialchars($parkNumber);
+                        $parkUrl = "https://reservecalifornia.com/park/" . htmlspecialchars($parkNumber);
                     } else {
-                        $parkUrl = "https://reservecalifornia.com/Web/Default.aspx#!";
+                        $parkUrl = "https://reservecalifornia.com";
                     }
                     $parkSections .= "<div style='margin-left: 16px; margin-bottom: 8px;'>";
                     $parkSections .= "<div style='font-weight: 500; color: #059669; font-size: 14px;'>";
@@ -251,7 +252,17 @@ class EmailTemplates
                     // Include park link with number if available
                     $parkNumber = null;
                     foreach ($facilitySites as $s) { if (!empty($s['park_number'])) { $parkNumber = (string)$s['park_number']; break; } }
-                    $parkUrlText = $parkNumber ? ("https://reservecalifornia.com/Web/Default.aspx#!park/" . $parkNumber) : "https://reservecalifornia.com/Web/Default.aspx#!";
+                    // Get facility external ID for URL
+                    $facilityId = null;
+                    foreach ($facilitySites as $s) { if (!empty($s['facility_external_id'])) { $facilityId = (string)$s['facility_external_id']; break; } }
+                    // URL format: https://reservecalifornia.com/park/{parkNumber}/{facilityId}
+                    if ($parkNumber && $facilityId) {
+                        $parkUrlText = "https://reservecalifornia.com/park/" . $parkNumber . "/" . $facilityId;
+                    } elseif ($parkNumber) {
+                        $parkUrlText = "https://reservecalifornia.com/park/" . $parkNumber;
+                    } else {
+                        $parkUrlText = "https://reservecalifornia.com";
+                    }
                     $lines[] = "   {$facilityName} (" . count($numbers) . " sites)";
                     $lines[] = "   View: {$parkUrlText}";
                     $lines[] = "   Sites: " . implode(', ', $rendered);

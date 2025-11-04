@@ -11,6 +11,7 @@ use CampsiteAgent\Services\ScraperService;
 use CampsiteAgent\Repositories\ParkRepository;
 use CampsiteAgent\Repositories\SettingsRepository;
 use CampsiteAgent\Repositories\FacilityRepository;
+use CampsiteAgent\Repositories\RunRepository;
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -287,7 +288,7 @@ if ($method === 'GET' && $uri === '/api/availability/latest') {
 
     // Don't LIMIT the raw query - we need all dates for each site to detect weekends
     $sql = 'SELECT p.id AS park_id, p.name AS park_name, p.park_number, p.website_url, s.id AS site_id, s.site_number, s.site_name, s.site_type, 
-                   f.id AS facility_id, f.name AS facility_name, a.date, a.created_at AS found_at
+                   f.id AS facility_id, f.facility_id AS facility_external_id, f.name AS facility_name, a.date, a.created_at AS found_at
             FROM parks p
             JOIN sites s ON s.park_id = p.id
             LEFT JOIN facilities f ON s.facility_id = f.id
@@ -322,6 +323,7 @@ if ($method === 'GET' && $uri === '/api/availability/latest') {
                 'site_type' => $r['site_type'],
                 'facility_name' => $r['facility_name'],
                 'facility_id' => isset($r['facility_id']) ? (int)$r['facility_id'] : null,
+                'facility_external_id' => isset($r['facility_external_id']) ? $r['facility_external_id'] : null,
                 'dates' => [],
                 'found_at' => $r['found_at']
             ];
@@ -471,6 +473,39 @@ if ($method === 'POST' && preg_match('#^/api/admin/parks/(\d+)/(activate|deactiv
     $repo = new ParkRepository();
     $repo->setActive($parkId, $action === 'activate');
     json(200, ['message' => $action === 'activate' ? 'Activated' : 'Deactivated']);
+}
+
+// Admin: get latest scrape runs
+if ($method === 'GET' && $uri === '/api/admin/scrape-runs') {
+    $uid = requireAuth();
+    requireAdmin($uid);
+    $limit = isset($_GET['limit']) ? min(100, max(1, (int)$_GET['limit'])) : 20;
+    $repo = new RunRepository();
+    $runs = $repo->getLatestRuns($limit);
+    
+    // Format the runs for JSON response
+    $formatted = array_map(function($run) {
+        $config = null;
+        if (!empty($run['configuration'])) {
+            $config = json_decode($run['configuration'], true);
+        }
+        
+        return [
+            'id' => (int)$run['id'],
+            'park_id' => $run['park_id'] ? (int)$run['park_id'] : null,
+            'park_name' => $run['park_name'] ?? 'All Parks',
+            'park_number' => $run['park_number'] ?? null,
+            'started_at' => $run['started_at'],
+            'finished_at' => $run['finished_at'],
+            'status' => $run['status'],
+            'error' => $run['error'],
+            'configuration' => $config,
+            'duration_seconds' => $run['duration_seconds'] ? (int)$run['duration_seconds'] : null,
+            'created_at' => $run['created_at']
+        ];
+    }, $runs);
+    
+    json(200, ['runs' => $formatted]);
 }
 
 if ($method === 'GET' && $uri === '/api/check-now') {
@@ -687,8 +722,19 @@ if ($method === 'POST' && $uri === '/api/admin/notifications/daily-test') {
             $parkWebsiteUrl = $stmt->fetchColumn();
         }
 
+        // Determine park name from sites (for daily digest)
+        $parkNames = [];
+        foreach ($alertSites as $site) {
+            if (!empty($site['park_name']) && !in_array($site['park_name'], $parkNames, true)) {
+                $parkNames[] = $site['park_name'];
+            }
+        }
+        $parkNameForEmail = count($parkNames) === 1 
+            ? $parkNames[0] 
+            : (count($parkNames) > 1 ? 'Multiple Parks' : 'Daily Digest');
+        
         $notify = new \CampsiteAgent\Services\NotificationService();
-        $ok = $notify->sendAvailabilityAlert($to, 'Daily Digest', $dateRangeStr, $alertSites, $favoriteSiteIds, $userId, $parkWebsiteUrl);
+        $ok = $notify->sendAvailabilityAlert($to, $parkNameForEmail, $dateRangeStr, $alertSites, $favoriteSiteIds, $userId, $parkWebsiteUrl);
 
         json(200, ['sent' => $ok, 'to' => $to, 'sites' => count($alertSites), 'dateRange' => $dateRangeStr]);
     } catch (\Throwable $e) {
@@ -982,7 +1028,18 @@ if ($method === 'POST' && $uri === '/api/admin/notifications/daily-run') {
                 $parkWebsiteUrl = $stmt->fetchColumn();
             }
             
-            $ok = $notify->sendAvailabilityAlert($user['email'], 'Daily Digest', $dateRangeStr, $userAlertSites, $favoriteSiteIds, $user['id'], $parkWebsiteUrl);
+            // Determine park name from sites (for daily digest)
+            $parkNames = [];
+            foreach ($userAlertSites as $site) {
+                if (!empty($site['park_name']) && !in_array($site['park_name'], $parkNames, true)) {
+                    $parkNames[] = $site['park_name'];
+                }
+            }
+            $parkNameForEmail = count($parkNames) === 1 
+                ? $parkNames[0] 
+                : (count($parkNames) > 1 ? 'Multiple Parks' : 'Daily Digest');
+            
+            $ok = $notify->sendAvailabilityAlert($user['email'], $parkNameForEmail, $dateRangeStr, $userAlertSites, $favoriteSiteIds, $user['id'], $parkWebsiteUrl);
             if ($ok) { $sent++; $details[] = ['email' => $user['email'], 'sites' => count($userAlertSites)]; }
             else { $failed++; }
         }
@@ -1776,7 +1833,18 @@ if ($method === 'POST' && $uri === '/api/user/send-digest') {
             $parkWebsiteUrl = $stmt->fetchColumn();
         }
         
-        $ok = $notify->sendAvailabilityAlert($user['email'], 'Personal Digest', $dateRangeStr, $userAlertSites, $favoriteSiteIds, $userId, $parkWebsiteUrl);
+        // Determine park name from sites (for personal digest)
+        $parkNames = [];
+        foreach ($userAlertSites as $site) {
+            if (!empty($site['park_name']) && !in_array($site['park_name'], $parkNames, true)) {
+                $parkNames[] = $site['park_name'];
+            }
+        }
+        $parkNameForEmail = count($parkNames) === 1 
+            ? $parkNames[0] 
+            : (count($parkNames) > 1 ? 'Multiple Parks' : 'Personal Digest');
+        
+        $ok = $notify->sendAvailabilityAlert($user['email'], $parkNameForEmail, $dateRangeStr, $userAlertSites, $favoriteSiteIds, $userId, $parkWebsiteUrl);
         
         if ($ok) {
             json(200, ['sent' => true, 'message' => 'Digest sent successfully', 'sites' => count($userAlertSites), 'dateRange' => $dateRangeStr]);

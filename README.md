@@ -480,6 +480,24 @@ This is a personal project shared for educational purposes only.
 
 ## 📋 Changelog
 
+### Version 2.1.1 (November 4, 2025)
+- **🔗 ReserveCalifornia URL Fix**: Updated booking links to use new URL format
+  - Changed from old format (`/Web/Default.aspx#!park/2`) to new format (`/park/{parkNumber}/{facilityId}`)
+  - Fixed 404 errors when clicking booking links
+  - Updated both dashboard and email notifications
+- **📧 Email Digest Improvements**: Fixed park name display in email digests
+  - Changed from generic "Daily Digest" to actual park names (e.g., "Chino Hills SP")
+  - Shows "Multiple Parks" when digest contains multiple parks
+  - Applied to all digest types: daily, personal, and test digests
+- **🗓️ Scraper Date Range Fix**: Fixed date range calculation to ensure 6 months from today
+  - Now correctly includes the month that contains "6 months from today"
+  - Previously stopped at April when it should include May (Nov + 6 months)
+- **🚨 Park Alerts Expiration Filtering**: Added automatic filtering of expired alerts
+  - Parses date ranges from alert text (e.g., "June 1-September 30")
+  - Automatically filters out alerts where expiration date has passed
+  - Filters alerts even if expiration_date is NULL by parsing text
+  - Prevents showing outdated alerts like "closed June 1-September 30" in November
+
 ### Version 2.1.0 (October 9, 2025)
 - **🚨 Park Alerts System**: Real-time park closure and restriction notifications
   - Automatic scraping of park safety alerts and restrictions

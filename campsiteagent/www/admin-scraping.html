@@ -365,6 +365,36 @@
         }
         .badge-active { background: #c6f6d5; color: #22543d; }
         .badge-inactive { background: #fed7d7; color: #742a2a; }
+        .badge-success { background: #c6f6d5; color: #22543d; }
+        .badge-error { background: #fed7d7; color: #742a2a; }
+        .badge-running { background: #feebc8; color: #7c2d12; }
+        .badge-pending { background: #e2e8f0; color: #2d3748; }
+        
+        .runs-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        .runs-table th {
+            background: #f7fafc;
+            padding: 0.75rem;
+            text-align: left;
+            font-weight: 600;
+            color: #4a5568;
+            border-bottom: 2px solid #e2e8f0;
+            font-size: 0.875rem;
+        }
+        .runs-table td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 0.875rem;
+        }
+        .runs-table tr:hover {
+            background: #f7fafc;
+        }
+        .runs-table tr:last-child td {
+            border-bottom: none;
+        }
         .btn-link {
             background: transparent;
             color: #4c51bf;
@@ -537,6 +567,23 @@
             .park-actions {
                 width: 100%;
                 justify-content: flex-start;
+            }
+            
+            /* Scrape runs table mobile styles */
+            .runs-table {
+                font-size: 12px;
+            }
+            
+            .runs-table th,
+            .runs-table td {
+                padding: 0.5rem;
+            }
+            
+            .runs-table th:nth-child(5),
+            .runs-table td:nth-child(5),
+            .runs-table th:nth-child(6),
+            .runs-table td:nth-child(6) {
+                display: none;
             }
             
             /* Parks management mobile styles */
@@ -719,6 +766,16 @@
                     </div>
                 </div>
             </div>
+
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h2 style="margin: 0; color: #4c51bf;">📋 Latest Scrape Runs</h2>
+                    <button id="refreshRuns" class="btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.9rem;">🔄 Refresh</button>
+                </div>
+                <div id="scrapeRunsContainer" style="min-height: 200px;">
+                    <div style="padding: 1rem; color: #718096; text-align: center;">Loading scrape history...</div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -840,6 +897,7 @@
                         document.getElementById('adminCheck').style.display = 'none';
                         document.getElementById('adminContent').style.display = 'block';
                         loadParks();
+                        loadScrapeRuns();
                     } else {
                         document.getElementById('adminCheck').innerHTML = `
                             <h2>❌ Access Denied</h2>
@@ -954,6 +1012,8 @@
                         }
                         
                         stopScraping();
+                        // Refresh scrape runs to show the new run
+                        setTimeout(loadScrapeRuns, 1000);
                         return;
                     }
                     
@@ -1727,6 +1787,99 @@
             });
             return response;
         }
+
+        // Load scrape runs history
+        async function loadScrapeRuns() {
+            const container = document.getElementById('scrapeRunsContainer');
+            container.innerHTML = '<div style="padding: 1rem; color: #718096; text-align: center;">Loading scrape history...</div>';
+            
+            try {
+                const res = await fetchWithAuth('/api/admin/scrape-runs?limit=20');
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                }
+                const data = await res.json();
+                const runs = data.runs || [];
+                
+                if (runs.length === 0) {
+                    container.innerHTML = '<div style="padding: 1rem; color: #718096; text-align: center;">No scrape runs found.</div>';
+                    return;
+                }
+                
+                // Create table
+                let html = '<table class="runs-table">';
+                html += '<thead><tr>';
+                html += '<th>Started</th>';
+                html += '<th>Park</th>';
+                html += '<th>Status</th>';
+                html += '<th>Duration</th>';
+                html += '<th>Finished</th>';
+                html += '<th>Error</th>';
+                html += '</tr></thead><tbody>';
+                
+                runs.forEach(run => {
+                    const started = new Date(run.started_at);
+                    const finished = run.finished_at ? new Date(run.finished_at) : null;
+                    const duration = run.duration_seconds !== null 
+                        ? formatDuration(run.duration_seconds)
+                        : (finished ? formatDuration(Math.floor((finished - started) / 1000)) : '—');
+                    
+                    let statusClass = 'badge-';
+                    let statusText = run.status;
+                    switch (run.status) {
+                        case 'success':
+                            statusClass += 'success';
+                            statusText = '✓ Success';
+                            break;
+                        case 'error':
+                            statusClass += 'error';
+                            statusText = '✗ Error';
+                            break;
+                        case 'running':
+                            statusClass += 'running';
+                            statusText = '⟳ Running';
+                            break;
+                        case 'pending':
+                            statusClass += 'pending';
+                            statusText = '⏳ Pending';
+                            break;
+                        default:
+                            statusClass += 'pending';
+                    }
+                    
+                    html += '<tr>';
+                    html += `<td>${started.toLocaleString()}</td>`;
+                    html += `<td>${run.park_name || 'N/A'}</td>`;
+                    html += `<td><span class="badge ${statusClass}">${statusText}</span></td>`;
+                    html += `<td>${duration}</td>`;
+                    html += `<td>${finished ? finished.toLocaleString() : '—'}</td>`;
+                    html += `<td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${run.error || ''}">${run.error ? run.error.substring(0, 50) + (run.error.length > 50 ? '...' : '') : '—'}</td>`;
+                    html += '</tr>';
+                });
+                
+                html += '</tbody></table>';
+                container.innerHTML = html;
+            } catch (e) {
+                container.innerHTML = `<div style="padding: 1rem; color: #e53e3e; text-align: center;">Error loading scrape runs: ${e.message}</div>`;
+            }
+        }
+        
+        function formatDuration(seconds) {
+            if (seconds < 60) {
+                return `${seconds}s`;
+            } else if (seconds < 3600) {
+                const mins = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                return `${mins}m ${secs}s`;
+            } else {
+                const hours = Math.floor(seconds / 3600);
+                const mins = Math.floor((seconds % 3600) / 60);
+                return `${hours}h ${mins}m`;
+            }
+        }
+        
+        // Event listener for refresh button
+        document.getElementById('refreshRuns').addEventListener('click', loadScrapeRuns);
 
         // Initialize
         checkAuth();

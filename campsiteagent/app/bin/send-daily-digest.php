@@ -232,7 +232,18 @@ if ((int)$gotLock !== 1) {
 			$parkWebsiteUrl = $stmt->fetchColumn();
 		}
 		
-		$ok = $notify->sendAvailabilityAlert($email, 'Daily Digest', $dateRangeStr, $userAlertSites, $favoriteSiteIds, $userId, $parkWebsiteUrl);
+		// Determine park name from sites (for daily digest)
+		$parkNames = [];
+		foreach ($userAlertSites as $site) {
+			if (!empty($site['park_name']) && !in_array($site['park_name'], $parkNames, true)) {
+				$parkNames[] = $site['park_name'];
+			}
+		}
+		$parkNameForEmail = count($parkNames) === 1 
+			? $parkNames[0] 
+			: (count($parkNames) > 1 ? 'Multiple Parks' : 'Daily Digest');
+		
+		$ok = $notify->sendAvailabilityAlert($email, $parkNameForEmail, $dateRangeStr, $userAlertSites, $favoriteSiteIds, $userId, $parkWebsiteUrl);
 		if ($ok) {
 			$sent++;
 			$details[] = ['email' => $email, 'sites' => count($userAlertSites)];

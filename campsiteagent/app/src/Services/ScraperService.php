@@ -332,8 +332,30 @@ class ScraperService
         };
         
         $entries = [];
+        // Start from first day of current month
         $start = new \DateTime('first day of this month');
-        for ($i = 0; $i < $monthsToScrape; $i++) {
+        
+        // Calculate target: ensure we cover at least the month that contains "6 months from today"
+        $today = new \DateTime();
+        $sixMonthsFromToday = clone $today;
+        $sixMonthsFromToday->modify('+6 months');
+        $targetMonth = $sixMonthsFromToday->format('Y-m');
+        
+        // Calculate how many months we need to scrape to reach the target month
+        $currentMonth = $start->format('Y-m');
+        $monthsNeeded = 0;
+        $checkMonth = clone $start;
+        while ($checkMonth->format('Y-m') < $targetMonth) {
+            $monthsNeeded++;
+            $checkMonth->modify('+1 month');
+        }
+        // Add one more month to ensure we include the target month
+        $monthsNeeded++;
+        
+        // Use the larger of: requested months or months needed to reach target
+        $actualMonthsToScrape = max($monthsToScrape, $monthsNeeded);
+        
+        for ($i = 0; $i < $actualMonthsToScrape; $i++) {
             $ym = $start->format('Y-m');
             
             if ($progressCallback) {
@@ -341,7 +363,7 @@ class ScraperService
                 $progressCallback([
                     'type' => 'month_progress',
                     'month' => $monthName,
-                    'progress' => ($i + 1) . '/' . $monthsToScrape,
+                    'progress' => ($i + 1) . '/' . $actualMonthsToScrape,
                     'message' => "  → Checking {$monthName}..."
                 ]);
             }

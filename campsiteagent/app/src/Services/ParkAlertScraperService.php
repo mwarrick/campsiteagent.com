@@ -228,18 +228,82 @@ class ParkAlertScraperService
                 if (!empty($text) && strlen($text) > 20 && !in_array($text, $seen) && 
                     !preg_match('/^(and|or)\s+/i', $text)) {
                     $seen[] = $text;
-                    $alerts[] = [
+                    
+                    // Parse dates from the text (e.g., "June 1-September 30" or "June 1 to September 30")
+                    $dates = $this->parseDateRangeFromText($text);
+                    
+                    $alert = [
                         'alert_type' => 'closure',
                         'severity' => 'warning',
                         'title' => $text,
                         'description' => $text,
                         'source_url' => $sourceUrl
                     ];
+                    
+                    // Add dates if parsed
+                    if ($dates) {
+                        $alert['effective_date'] = $dates['effective_date'];
+                        $alert['expiration_date'] = $dates['expiration_date'];
+                    }
+                    
+                    $alerts[] = $alert;
                 }
             }
         }
         
         return $alerts;
+    }
+    
+    /**
+     * Parse date range from alert text
+     * Examples: "June 1-September 30", "June 1 to September 30", "closed June 1-September 30"
+     */
+    private function parseDateRangeFromText(string $text): ?array
+    {
+        // Pattern to match month day - month day patterns
+        // Matches: "June 1-September 30", "June 1 to September 30", "June 1 through September 30"
+        if (preg_match('/(\w+)\s+(\d{1,2})[\s-]+(?:to|through|-)\s+(\w+)\s+(\d{1,2})/i', $text, $matches)) {
+            $startMonth = $matches[1];
+            $startDay = (int)$matches[2];
+            $endMonth = $matches[3];
+            $endDay = (int)$matches[4];
+            
+            // Get current year
+            $currentYear = (int)date('Y');
+            
+            // Convert month names to numbers
+            $monthNames = [
+                'january' => 1, 'february' => 2, 'march' => 3, 'april' => 4,
+                'may' => 5, 'june' => 6, 'july' => 7, 'august' => 8,
+                'september' => 9, 'october' => 10, 'november' => 11, 'december' => 12
+            ];
+            
+            $startMonthNum = $monthNames[strtolower($startMonth)] ?? null;
+            $endMonthNum = $monthNames[strtolower($endMonth)] ?? null;
+            
+            if ($startMonthNum && $endMonthNum) {
+                // Determine year - if end month is before start month, end is next year
+                $endYear = $currentYear;
+                if ($endMonthNum < $startMonthNum) {
+                    $endYear = $currentYear + 1;
+                }
+                
+                // Create date strings
+                $effectiveDate = sprintf('%04d-%02d-%02d', $currentYear, $startMonthNum, $startDay);
+                $expirationDate = sprintf('%04d-%02d-%02d', $endYear, $endMonthNum, $endDay);
+                
+                // Validate dates
+                if (checkdate($startMonthNum, $startDay, $currentYear) && 
+                    checkdate($endMonthNum, $endDay, $endYear)) {
+                    return [
+                        'effective_date' => $effectiveDate,
+                        'expiration_date' => $expirationDate
+                    ];
+                }
+            }
+        }
+        
+        return null;
     }
 
     /**

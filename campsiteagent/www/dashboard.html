@@ -431,8 +431,8 @@
     }
 
     // Function to show ReserveCalifornia modal and open link
-    window.openReserveCalifornia = function(url, availabilityDate) {
-      console.log('openReserveCalifornia called with:', url, availabilityDate);
+    window.openReserveCalifornia = function(url, availabilityDate, parkName) {
+      console.log('openReserveCalifornia called with:', url, availabilityDate, parkName);
       
       // Determine if this is a weekend (2-night) or daily (1-night) listing
       const isWeekend = availabilityDate.includes(' - ');
@@ -831,16 +831,25 @@
             const byFacility = {};
             weekend.sites.forEach(s => {
               const facilityName = s.facility_name || 'Unknown Facility';
-              if (!byFacility[facilityName]) {
-                byFacility[facilityName] = [];
+              const facilityId = s.facility_id; // Database ID for the facility
+              const key = facilityId || facilityName; // Use ID if available, otherwise name
+              if (!byFacility[key]) {
+                byFacility[key] = {
+                  name: facilityName,
+                  id: facilityId,
+                  sites: []
+                };
               }
-              byFacility[facilityName].push(s);
+              byFacility[key].sites.push(s);
             });
             
             // Build facility sections with booking links; skip facilities with 0 sites after filtering
             let totalShownInWeekend = 0;
-            const facilitySections = Object.keys(byFacility).sort().map(facilityName => {
-              let sites = byFacility[facilityName].slice();
+            const facilitySections = Object.keys(byFacility).sort().map(key => {
+              const facility = byFacility[key];
+              const facilityName = facility.name;
+              const facilityId = facility.id;
+              let sites = facility.sites.slice();
               // If favorites only is selected, filter to favorites
               const favOnly = document.getElementById('favoritesOnly')?.checked;
               if (favOnly) {
@@ -858,20 +867,32 @@
               totalShownInWeekend += sites.length;
               const siteNumbers = sites.map(s => s.site_number).join(', ');
               
-              // Link to park page (ReserveCalifornia doesn't support deep linking with dates)
+              // Link to park/facility page on ReserveCalifornia
               const parkNumber = park.park_number || '712'; // fallback to San Onofre
-              const bookUrl = `https://reservecalifornia.com/Web/Default.aspx#!park/${parkNumber}`;
+              // Get facility external ID from first site (all sites in this group share same facility)
+              const facilityExternalId = sites.length > 0 && sites[0].facility_external_id 
+                ? sites[0].facility_external_id 
+                : null;
+              // URL format: https://reservecalifornia.com/park/{parkNumber}/{facilityId}
+              const bookUrl = facilityExternalId 
+                ? `https://reservecalifornia.com/park/${parkNumber}/${facilityExternalId}`
+                : `https://reservecalifornia.com/park/${parkNumber}`;
               
               // Discovery time label from earliest found_at among sites in this facility group
               const foundTimes = sites.map(s => s.found_at).filter(Boolean).sort();
               const foundAt = foundTimes.length ? new Date(foundTimes[0].replace(' ', 'T')) : null;
               const foundLabel = foundAt ? `Found ${foundAt.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' })} @ ${foundAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}` : '';
 
+              // Make facility name clickable to manage favorites if facility_id is available
+              const facilityNameLink = facilityId 
+                ? `<a href="#" onclick="event.preventDefault(); openManageFavorites(${facilityId}, '${facilityName.replace(/'/g, "\\'")}'); return false;" style="color: #059669; text-decoration: none; cursor: pointer;" title="Manage favorites for this facility">${facilityName}</a>`
+                : facilityName;
+              
               return `
                 <div style="margin-left: 16px; margin-bottom: 8px;">
                   <div style="font-weight: 500; color: #059669; font-size: 14px;">
-                    ${facilityName} (${sites.length} sites)
-                    <a href="#" class="reserve-link" data-url="${bookUrl}" data-date="${friFormatted} - ${sunFormatted}" style="margin-left: 8px; font-size: 12px; color: #2563eb; text-decoration: none;">→ View</a>
+                    ${facilityNameLink} (${sites.length} sites)
+                    <a href="#" class="reserve-link" data-url="${bookUrl}" data-date="${friFormatted} - ${sunFormatted}" data-park="${park.park}" data-facility-id="${facilityExternalId || ''}" style="margin-left: 8px; font-size: 12px; color: #2563eb; text-decoration: none;">→ View</a>
                     ${foundLabel ? `<span style=\"margin-left:8px; font-size:12px; color:#4a5568;\">${foundLabel}</span>` : ''}
                   </div>
                   <div style="font-size: 13px; color: #6b7280; margin-left: 8px;">
@@ -972,16 +993,25 @@
             const byFacility = {};
             byDate[date].forEach(s => {
               const facilityName = s.facility_name || 'Unknown Facility';
-              if (!byFacility[facilityName]) {
-                byFacility[facilityName] = [];
+              const facilityId = s.facility_id; // Database ID for the facility
+              const key = facilityId || facilityName; // Use ID if available, otherwise name
+              if (!byFacility[key]) {
+                byFacility[key] = {
+                  name: facilityName,
+                  id: facilityId,
+                  sites: []
+                };
               }
-              byFacility[facilityName].push(s);
+              byFacility[key].sites.push(s);
             });
             
             // Build facility sections with booking links
             let totalShownOnDate = 0;
-            const facilitySections = Object.keys(byFacility).sort().map(facilityName => {
-              let sites = byFacility[facilityName].slice();
+            const facilitySections = Object.keys(byFacility).sort().map(key => {
+              const facility = byFacility[key];
+              const facilityName = facility.name;
+              const facilityId = facility.id;
+              let sites = facility.sites.slice();
               // If favorites only is selected, filter to favorites
               const favOnly = document.getElementById('favoritesOnly')?.checked;
               if (favOnly) {
@@ -999,20 +1029,32 @@
               totalShownOnDate += sites.length;
               const siteNumbers = sites.map(s => s.site_number).join(', ');
               
-              // Link to park page
+              // Link to park/facility page on ReserveCalifornia
               const parkNumber = park.park_number || '712'; // fallback to San Onofre
-              const bookUrl = `https://reservecalifornia.com/Web/Default.aspx#!park/${parkNumber}`;
+              // Get facility external ID from first site (all sites in this group share same facility)
+              const facilityExternalId = sites.length > 0 && sites[0].facility_external_id 
+                ? sites[0].facility_external_id 
+                : null;
+              // URL format: https://reservecalifornia.com/park/{parkNumber}/{facilityId}
+              const bookUrl = facilityExternalId 
+                ? `https://reservecalifornia.com/park/${parkNumber}/${facilityExternalId}`
+                : `https://reservecalifornia.com/park/${parkNumber}`;
               
               // Discovery time label from earliest found_at among sites in this facility group
               const foundTimes = sites.map(s => s.found_at).filter(Boolean).sort();
               const foundAt = foundTimes.length ? new Date(foundTimes[0].replace(' ', 'T')) : null;
               const foundLabel = foundAt ? `Found ${foundAt.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' })} @ ${foundAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}` : '';
 
+              // Make facility name clickable to manage favorites if facility_id is available
+              const facilityNameLink = facilityId 
+                ? `<a href="#" onclick="event.preventDefault(); openManageFavorites(${facilityId}, '${facilityName.replace(/'/g, "\\'")}'); return false;" style="color: #059669; text-decoration: none; cursor: pointer;" title="Manage favorites for this facility">${facilityName}</a>`
+                : facilityName;
+
               return `
                 <div style="margin-left: 16px; margin-bottom: 8px;">
                   <div style="font-weight: 500; color: #059669; font-size: 14px;">
-                    ${facilityName} (${sites.length} sites)
-                    <a href="#" class="reserve-link" data-url="${bookUrl}" data-date="${dateFormatted}" style="margin-left: 8px; font-size: 12px; color: #2563eb; text-decoration: none;">→ View</a>
+                    ${facilityNameLink} (${sites.length} sites)
+                    <a href="#" class="reserve-link" data-url="${bookUrl}" data-date="${dateFormatted}" data-park="${park.park}" data-facility-id="${facilityExternalId || ''}" style="margin-left: 8px; font-size: 12px; color: #2563eb; text-decoration: none;">→ View</a>
                   </div>
                   <div style="font-size: 13px; color: #6b7280; margin: 2px 0;">
                     ${siteNumbers}
@@ -1507,10 +1549,11 @@
         console.log('ReserveCalifornia link clicked!');
         const url = e.target.getAttribute('data-url');
         const date = e.target.getAttribute('data-date');
-        console.log('URL:', url, 'Date:', date);
+        const parkName = e.target.getAttribute('data-park') || 'Unknown';
+        console.log('URL:', url, 'Date:', date, 'Park:', parkName);
         console.log('openReserveCalifornia function exists:', typeof openReserveCalifornia);
         try {
-          openReserveCalifornia(url, date);
+          openReserveCalifornia(url, date, parkName);
         } catch (error) {
           console.error('Error opening ReserveCalifornia modal:', error);
           alert('Error opening ReserveCalifornia modal: ' + error.message);

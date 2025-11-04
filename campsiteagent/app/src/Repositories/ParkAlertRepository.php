@@ -80,16 +80,77 @@ class ParkAlertRepository
         }
         
         $placeholders = str_repeat('?,', count($parkIds) - 1) . '?';
+        // Filter out alerts where expiration_date has passed
+        // Also filter alerts with date ranges in the past by checking if expiration_date is before today
         $sql = "SELECT * FROM park_alerts 
                 WHERE park_id IN ($placeholders)
                   AND is_active = 1 
                   AND (expiration_date IS NULL OR expiration_date >= CURDATE())
+                  AND (effective_date IS NULL OR effective_date <= CURDATE())
                 ORDER BY park_id, severity DESC, created_at DESC";
         
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($parkIds);
         
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Additional filter: check if alert text contains past date ranges
+        $filtered = [];
+        foreach ($alerts as $alert) {
+            // If expiration_date is NULL, check if the text mentions dates that have passed
+            if ($alert['expiration_date'] === null) {
+                // Check if text contains month ranges that are in the past
+                if (!$this->isAlertTextExpired($alert['title'] . ' ' . ($alert['description'] ?? ''))) {
+                    $filtered[] = $alert;
+                }
+            } else {
+                $filtered[] = $alert;
+            }
+        }
+        
+        return $filtered;
+    }
+    
+    /**
+     * Check if alert text contains date ranges that are in the past
+     */
+    private function isAlertTextExpired(string $text): bool
+    {
+        // Pattern to match month day - month day patterns
+        if (preg_match('/(\w+)\s+(\d{1,2})[\s-]+(?:to|through|-)\s+(\w+)\s+(\d{1,2})/i', $text, $matches)) {
+            $startMonth = $matches[1];
+            $startDay = (int)$matches[2];
+            $endMonth = $matches[3];
+            $endDay = (int)$matches[4];
+            
+            $currentYear = (int)date('Y');
+            $today = new \DateTime();
+            
+            $monthNames = [
+                'january' => 1, 'february' => 2, 'march' => 3, 'april' => 4,
+                'may' => 5, 'june' => 6, 'july' => 7, 'august' => 8,
+                'september' => 9, 'october' => 10, 'november' => 11, 'december' => 12
+            ];
+            
+            $startMonthNum = $monthNames[strtolower($startMonth)] ?? null;
+            $endMonthNum = $monthNames[strtolower($endMonth)] ?? null;
+            
+            if ($startMonthNum && $endMonthNum) {
+                // Determine year - if end month is before start month, end is next year
+                $endYear = $currentYear;
+                if ($endMonthNum < $startMonthNum) {
+                    $endYear = $currentYear + 1;
+                }
+                
+                // Check if the end date has passed
+                $endDate = new \DateTime("$endYear-$endMonthNum-$endDay");
+                if ($endDate < $today) {
+                    return true; // Alert is expired
+                }
+            }
+        }
+        
+        return false;
     }
 
     /**

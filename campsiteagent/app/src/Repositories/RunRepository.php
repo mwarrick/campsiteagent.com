@@ -66,4 +66,34 @@ class RunRepository
         $row = $stmt->fetch();
         return $row ? $row['configuration'] : null;
     }
+
+    /**
+     * Get latest scrape runs with optional limit
+     * @param int $limit Maximum number of runs to return
+     * @return array Array of run records with park information
+     */
+    public function getLatestRuns(int $limit = 20): array
+    {
+        $sql = 'SELECT 
+                    ar.id,
+                    ar.park_id,
+                    ar.started_at,
+                    ar.finished_at,
+                    ar.status,
+                    ar.error,
+                    ar.configuration,
+                    ar.created_at,
+                    p.name AS park_name,
+                    p.park_number,
+                    TIMESTAMPDIFF(SECOND, ar.started_at, COALESCE(ar.finished_at, NOW())) AS duration_seconds
+                FROM availability_runs ar
+                LEFT JOIN parks p ON ar.park_id = p.id
+                ORDER BY ar.started_at DESC
+                LIMIT :limit';
+        
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }
