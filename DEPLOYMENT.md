@@ -382,8 +382,8 @@ sudo nano /usr/local/bin/campsiteagent-backup.sh
 BACKUP_DIR="/var/backups/campsiteagent"
 DATE=$(date +%Y%m%d_%H%M%S)
 # Load database credentials from environment or .env file
-DB_NAME="${DB_DATABASE:-campsitechecker}"
-DB_USER="${DB_USERNAME:-campsiteagent}"
+DB_NAME="${DB_DATABASE:-your_database_name}"
+DB_USER="${DB_USERNAME:-your_database_user}"
 DB_PASS="${DB_PASSWORD}"
 
 # Create backup directory
@@ -520,8 +520,8 @@ $health = [
 try {
     // Use environment variables - never hardcode credentials
     $host = getenv('DB_HOST') ?: '127.0.0.1';
-    $db = getenv('DB_DATABASE') ?: 'campsitechecker';
-    $user = getenv('DB_USERNAME') ?: 'campsiteagent';
+    $db = getenv('DB_DATABASE') ?: 'your_database_name';
+    $user = getenv('DB_USERNAME') ?: 'your_database_user';
     $pass = getenv('DB_PASSWORD') ?: '';
     
     $pdo = new PDO(
