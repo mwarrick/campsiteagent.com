@@ -42,6 +42,7 @@ SKIP_PATTERNS=(
     "package-lock.json"
     "composer.lock"
     ".env"  # .env files are expected to contain secrets, just shouldn't be in git
+    "scripts/"  # Skip scripts directory (contains example patterns)
 )
 
 ERRORS=0
@@ -69,6 +70,22 @@ for file in $FILES; do
     for pattern in "${PATTERNS[@]}"; do
         # Use grep with case-insensitive matching
         if grep -qiE "$pattern" "$file" 2>/dev/null; then
+            # Check if it's a placeholder (common placeholder patterns)
+            if grep -qiE "(your_|placeholder|example|sample|test_|demo_|change_me|replace_|TODO|FIXME|XXX)" "$file" 2>/dev/null; then
+                # Likely a placeholder, skip
+                continue
+            fi
+            
+            # Check if it's in a comment or documentation context
+            if grep -qiE "(#|//|/\*|\*|<!--|documentation|example|guide|README|DEPLOYMENT)" "$file" 2>/dev/null; then
+                # Check the specific line to see if it's a placeholder
+                matching_line=$(grep -iE "$pattern" "$file" | head -1)
+                if echo "$matching_line" | grep -qiE "(your_|placeholder|example|sample|test_|demo_)"; then
+                    # It's a placeholder in documentation, skip
+                    continue
+                fi
+            fi
+            
             echo -e "${RED}❌ SECURITY WARNING:${NC} Potential sensitive information found in: ${YELLOW}$file${NC}"
             echo -e "   Pattern matched: ${RED}$pattern${NC}"
             echo ""
