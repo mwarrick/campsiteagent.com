@@ -12,6 +12,8 @@ use CampsiteAgent\Repositories\ParkRepository;
 use CampsiteAgent\Repositories\SettingsRepository;
 use CampsiteAgent\Repositories\FacilityRepository;
 use CampsiteAgent\Repositories\RunRepository;
+use Exception;
+use Error;
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -259,7 +261,14 @@ if ($method === 'GET' && $uri === '/api/availability/export.csv') {
 // Availability latest (public)
 if ($method === 'GET' && $uri === '/api/availability/latest') {
     $pdo = Database::getConnection();
-    $parkId = isset($_GET['parkId']) ? (int)$_GET['parkId'] : null;
+    // Handle parkId: only set if it's provided and not empty
+    $parkId = null;
+    if (isset($_GET['parkId']) && $_GET['parkId'] !== '' && $_GET['parkId'] !== '0') {
+        $parkId = (int)$_GET['parkId'];
+        if ($parkId <= 0) {
+            $parkId = null; // Invalid park ID, treat as "all parks"
+        }
+    }
     $weekendOnly = isset($_GET['weekendOnly']) && $_GET['weekendOnly'] === '1';
     $dateRangeParam = $_GET['dateRange'] ?? 'all';
     $page = max(1, (int)($_GET['page'] ?? 1));
@@ -895,6 +904,7 @@ if ($method === 'POST' && $uri === '/api/admin/notifications/daily-run') {
         $pdo = Database::getConnection();
         $notify = new \CampsiteAgent\Services\NotificationService();
         $favRepo = new \CampsiteAgent\Repositories\UserFavoritesRepository();
+        $emailLogs = new \CampsiteAgent\Repositories\EmailLogRepository();
 
         // Users with at least one enabled preference
         $users = $pdo->query('SELECT DISTINCT u.id, u.email, u.first_name
@@ -906,6 +916,13 @@ if ($method === 'POST' && $uri === '/api/admin/notifications/daily-run') {
 
         foreach ($users as $user) {
             $userId = (int)$user['id'];
+            $email = $user['email'];
+            
+            // Idempotency: skip if we already sent a Daily Digest to this email today
+            if ($emailLogs->hasSentDailyDigestToday($email)) {
+                $skipped++;
+                continue;
+            }
 
             // Load preferences
             $st = $pdo->prepare('SELECT * FROM user_alert_preferences WHERE user_id = :uid AND enabled = 1');
@@ -964,6 +981,16 @@ if ($method === 'POST' && $uri === '/api/admin/notifications/daily-run') {
                 $startDate = $pref['start_date'] ?? null;
                 $endDate = $pref['end_date'] ?? null;
                 $weekendOnlyPref = isset($pref['weekend_only']) ? ((int)$pref['weekend_only'] === 1) : true;
+                
+                // If end_date is in the past, ignore it (treat as NULL) since user wants current availability
+                $today = date('Y-m-d');
+                if ($endDate && $endDate < $today) {
+                    $endDate = null;
+                }
+                // If start_date is in the past, ignore it (treat as NULL) since user wants current availability
+                if ($startDate && $startDate < $today) {
+                    $startDate = null;
+                }
 
                 foreach ($byPark as $parkName => $sites) {
                     foreach ($sites as $s) {
@@ -1530,14 +1557,28 @@ if ($method === 'GET' && $uri === '/api/admin/park-alerts') {
         require_once $repoPath;
         $alertRepository = new \CampsiteAgent\Repositories\ParkAlertRepository($pdo);
         
-        // Get all active alerts with park information
-        $sql = 'SELECT 
-                    pa.*,
-                    p.name as park_name
-                FROM park_alerts pa
-                JOIN parks p ON pa.park_id = p.id
-                WHERE pa.is_active = 1
-                ORDER BY p.name ASC, pa.severity DESC, pa.created_at DESC';
+        // Check if inactive alerts should be included
+        $includeInactive = isset($_GET['include_inactive']) && $_GET['include_inactive'] === '1';
+        
+        // Get alerts with park information
+        if ($includeInactive) {
+            // Get all alerts (active and inactive)
+            $sql = 'SELECT 
+                        pa.*,
+                        p.name as park_name
+                    FROM park_alerts pa
+                    JOIN parks p ON pa.park_id = p.id
+                    ORDER BY pa.is_active DESC, p.name ASC, pa.severity DESC, pa.created_at DESC';
+        } else {
+            // Get only active alerts
+            $sql = 'SELECT 
+                        pa.*,
+                        p.name as park_name
+                    FROM park_alerts pa
+                    JOIN parks p ON pa.park_id = p.id
+                    WHERE pa.is_active = 1
+                    ORDER BY p.name ASC, pa.severity DESC, pa.created_at DESC';
+        }
         
         $stmt = $pdo->prepare($sql);
         $stmt->execute();
@@ -1698,6 +1739,7 @@ if ($method === 'POST' && $uri === '/api/user/send-digest') {
         $pdo = Database::getConnection();
         $notify = new \CampsiteAgent\Services\NotificationService();
         $favRepo = new \CampsiteAgent\Repositories\UserFavoritesRepository();
+        $emailLogs = new \CampsiteAgent\Repositories\EmailLogRepository();
         
         // Get user info
         $stmt = $pdo->prepare('SELECT id, email, first_name FROM users WHERE id = :id');
@@ -1707,6 +1749,9 @@ if ($method === 'POST' && $uri === '/api/user/send-digest') {
         if (!$user) {
             json(404, ['error' => 'User not found']);
         }
+        
+        // Note: We skip the "already sent today" check for manual requests
+        // to allow users to request a digest even if one was already sent today
         
         // Load user's enabled preferences
         $st = $pdo->prepare('SELECT * FROM user_alert_preferences WHERE user_id = :uid AND enabled = 1');
@@ -1719,6 +1764,10 @@ if ($method === 'POST' && $uri === '/api/user/send-digest') {
         
         $userAlertSites = [];
         $allFridays = [];
+        
+        $totalRowsFound = 0;
+        $totalSitesAfterFiltering = 0;
+        $filterDetails = [];
         
         foreach ($prefs as $pref) {
             $parkFilterSql = '';
@@ -1741,6 +1790,7 @@ if ($method === 'POST' && $uri === '/api/user/send-digest') {
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
             $rows = $stmt->fetchAll();
+            $totalRowsFound += count($rows);
             
             // Group by park/site
             $byPark = [];
@@ -1769,8 +1819,26 @@ if ($method === 'POST' && $uri === '/api/user/send-digest') {
             $endDate = $pref['end_date'] ?? null;
             $weekendOnlyPref = isset($pref['weekend_only']) ? ((int)$pref['weekend_only'] === 1) : true;
             
+            // If end_date is in the past, ignore it (treat as NULL) since user wants current availability
+            $today = date('Y-m-d');
+            if ($endDate && $endDate < $today) {
+                $endDate = null;
+            }
+            // If start_date is in the past, ignore it (treat as NULL) since user wants current availability
+            if ($startDate && $startDate < $today) {
+                $startDate = null;
+            }
+            
+            $sitesBeforeFilter = 0;
+            $sitesAfterFilter = 0;
+            $datesBeforeFilter = 0;
+            $datesAfterFilter = 0;
+            
             foreach ($byPark as $parkName => $sites) {
                 foreach ($sites as $s) {
+                    $sitesBeforeFilter++;
+                    $datesBeforeFilter += count($s['dates']);
+                    
                     $dateSet = array_fill_keys($s['dates'], true);
                     $weekendDates = [];
                     if ($weekendOnlyPref) {
@@ -1799,6 +1867,8 @@ if ($method === 'POST' && $uri === '/api/user/send-digest') {
                     }
                     
                     if (!empty($weekendDates)) {
+                        $sitesAfterFilter++;
+                        $datesAfterFilter += count($weekendDates);
                         $userAlertSites[] = [
                             'site_id' => $s['site_id'],
                             'site_number' => $s['site_number'],
@@ -1812,10 +1882,42 @@ if ($method === 'POST' && $uri === '/api/user/send-digest') {
                     }
                 }
             }
+            
+            $totalSitesAfterFiltering += $sitesAfterFilter;
+            
+            $filterDetails[] = [
+                'park_id' => $pref['park_id'] ?? 'all parks',
+                'weekend_only' => $weekendOnlyPref,
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+                'sites_before' => $sitesBeforeFilter,
+                'sites_after' => $sitesAfterFilter,
+                'dates_before' => $datesBeforeFilter,
+                'dates_after' => $datesAfterFilter
+            ];
         }
         
         if (empty($userAlertSites)) {
-            json(200, ['sent' => false, 'message' => 'No matching availability found for your preferences.']);
+            $message = 'No matching availability found for your preferences.';
+            $message .= ' Found ' . $totalRowsFound . ' available dates, but none matched your filters.';
+            if (!empty($filterDetails)) {
+                $details = [];
+                foreach ($filterDetails as $fd) {
+                    $details[] = sprintf(
+                        'Park: %s, Weekend-only: %s, Date range: %s to %s, Sites: %d→%d, Dates: %d→%d',
+                        $fd['park_id'] === null ? 'all' : $fd['park_id'],
+                        $fd['weekend_only'] ? 'yes' : 'no',
+                        $fd['start_date'] ?? 'any',
+                        $fd['end_date'] ?? 'any',
+                        $fd['sites_before'],
+                        $fd['sites_after'],
+                        $fd['dates_before'],
+                        $fd['dates_after']
+                    );
+                }
+                $message .= ' Filter details: ' . implode('; ', $details);
+            }
+            json(200, ['sent' => false, 'message' => $message, 'debug' => $filterDetails]);
         }
         
         $earliest = !empty($allFridays) ? min($allFridays) : date('Y-m-d');

@@ -216,6 +216,82 @@
             margin-bottom: 0.5rem;
             color: #4a5568;
         }
+
+        .alert-card.alert-inactive {
+            opacity: 0.6;
+            background: #f7fafc;
+            border-left-color: #a0aec0;
+        }
+
+        .alert-card.alert-inactive .alert-title {
+            text-decoration: line-through;
+        }
+
+        .inactive-badge {
+            display: inline-block;
+            background: #a0aec0;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+
+        .filter-controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            background: #f8fafc;
+            border-radius: 8px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #cbd5e0;
+            transition: .3s;
+            border-radius: 24px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background-color: #4c51bf;
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(26px);
+        }
     </style>
 </head>
 <body>
@@ -241,6 +317,15 @@
 
         <div class="card">
             <h2 style="color: #4c51bf; margin-bottom: 1.5rem;">🚨 All Park Alerts</h2>
+            <div class="filter-controls">
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                    <span style="font-weight: 500;">Show Inactive Alerts:</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="showInactiveToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </label>
+            </div>
             <div id="alertsContainer">
                 <div class="loading">Loading alerts...</div>
             </div>
@@ -287,9 +372,11 @@
         async function loadAlerts() {
             const statsContainer = document.getElementById('statsContainer');
             const alertsContainer = document.getElementById('alertsContainer');
+            const showInactive = document.getElementById('showInactiveToggle').checked;
             
             try {
-                const res = await fetch('/api/admin/park-alerts', { credentials: 'same-origin' });
+                const url = `/api/admin/park-alerts${showInactive ? '?include_inactive=1' : ''}`;
+                const res = await fetch(url, { credentials: 'same-origin' });
                 
                 if (!res.ok) {
                     if (res.status === 401 || res.status === 403) {
@@ -366,49 +453,91 @@
         function renderAlerts(alerts) {
             const alertsContainer = document.getElementById('alertsContainer');
             
+            // Separate active and inactive alerts
+            const activeAlerts = alerts.filter(a => a.is_active == 1);
+            const inactiveAlerts = alerts.filter(a => a.is_active == 0);
+            
             // Group alerts by park
             const alertsByPark = {};
             alerts.forEach(alert => {
                 if (!alertsByPark[alert.park_name]) {
-                    alertsByPark[alert.park_name] = [];
+                    alertsByPark[alert.park_name] = { active: [], inactive: [] };
                 }
-                alertsByPark[alert.park_name].push(alert);
+                if (alert.is_active == 1) {
+                    alertsByPark[alert.park_name].active.push(alert);
+                } else {
+                    alertsByPark[alert.park_name].inactive.push(alert);
+                }
             });
             
             let html = '';
             for (const [parkName, parkAlerts] of Object.entries(alertsByPark)) {
-                html += `<div class="park-name">🏞️ ${parkName}</div>`;
+                // Show active alerts first
+                if (parkAlerts.active.length > 0) {
+                    html += `<div class="park-name">🏞️ ${parkName}</div>`;
+                    
+                    parkAlerts.active.forEach(alert => {
+                        html += renderAlertCard(alert);
+                    });
+                }
                 
-                parkAlerts.forEach(alert => {
-                    const icon = alert.severity === 'critical' ? '🚨' : 
-                                alert.severity === 'warning' ? '⚠️' : 'ℹ️';
+                // Show inactive alerts if toggle is on
+                if (parkAlerts.inactive.length > 0 && document.getElementById('showInactiveToggle').checked) {
+                    if (parkAlerts.active.length === 0) {
+                        html += `<div class="park-name">🏞️ ${parkName}</div>`;
+                    }
+                    html += `<div style="margin-top: 1rem; margin-bottom: 0.5rem; color: #6b7280; font-size: 0.9rem; font-weight: 500;">Inactive Alerts (${parkAlerts.inactive.length}):</div>`;
                     
-                    const createdDate = new Date(alert.created_at).toLocaleDateString();
-                    const scrapedDate = new Date(alert.scraped_at).toLocaleDateString();
-                    
-                    html += `
-                        <div class="alert-card alert-${alert.severity}">
-                            <div class="alert-header">
-                                <div>
-                                    <div class="alert-title">
-                                        <span class="alert-icon">${icon}</span>
-                                        ${alert.title}
-                                    </div>
-                                    <div class="alert-meta">
-                                        <span><strong>Type:</strong> ${alert.alert_type}</span>
-                                        <span><strong>Severity:</strong> ${alert.severity}</span>
-                                        <span><strong>Created:</strong> ${createdDate}</span>
-                                        <span><strong>Scraped:</strong> ${scrapedDate}</span>
-                                    </div>
-                                    ${alert.description ? `<div class="alert-description">${alert.description}</div>` : ''}
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
+                    parkAlerts.inactive.forEach(alert => {
+                        html += renderAlertCard(alert);
+                    });
+                }
             }
             
             alertsContainer.innerHTML = html;
+        }
+
+        function renderAlertCard(alert) {
+            const icon = alert.severity === 'critical' ? '🚨' : 
+                        alert.severity === 'warning' ? '⚠️' : 'ℹ️';
+            
+            const createdDate = new Date(alert.created_at).toLocaleDateString();
+            const scrapedDate = new Date(alert.scraped_at).toLocaleDateString();
+            const isInactive = alert.is_active == 0;
+            const inactiveClass = isInactive ? ' alert-inactive' : '';
+            const inactiveBadge = isInactive ? '<span class="inactive-badge">INACTIVE</span>' : '';
+            
+            let dateInfo = '';
+            if (alert.effective_date || alert.expiration_date) {
+                const effective = alert.effective_date ? new Date(alert.effective_date).toLocaleDateString() : 'N/A';
+                const expiration = alert.expiration_date ? new Date(alert.expiration_date).toLocaleDateString() : 'N/A';
+                dateInfo = `<div class="alert-meta">
+                    <span><strong>Effective:</strong> ${effective}</span>
+                    <span><strong>Expires:</strong> ${expiration}</span>
+                </div>`;
+            }
+            
+            return `
+                <div class="alert-card alert-${alert.severity}${inactiveClass}">
+                    <div class="alert-header">
+                        <div>
+                            <div class="alert-title">
+                                <span class="alert-icon">${icon}</span>
+                                ${alert.title}
+                                ${inactiveBadge}
+                            </div>
+                            <div class="alert-meta">
+                                <span><strong>Type:</strong> ${alert.alert_type}</span>
+                                <span><strong>Severity:</strong> ${alert.severity}</span>
+                                <span><strong>Created:</strong> ${createdDate}</span>
+                                <span><strong>Scraped:</strong> ${scrapedDate}</span>
+                            </div>
+                            ${dateInfo}
+                            ${alert.description ? `<div class="alert-description">${alert.description}</div>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
         }
 
         // Event listeners
@@ -421,6 +550,10 @@
                 btn.disabled = false;
                 btn.textContent = '🔄 Refresh';
             });
+        });
+
+        document.getElementById('showInactiveToggle').addEventListener('change', () => {
+            loadAlerts();
         });
 
         document.getElementById('logoutBtn').addEventListener('click', async () => {

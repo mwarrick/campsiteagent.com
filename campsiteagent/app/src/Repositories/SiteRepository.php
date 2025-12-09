@@ -29,15 +29,19 @@ class SiteRepository
         ?string $externalFacilityId = null
     ): int {
         // Find existing by park_id, facility_id, and site_number
+        // Use !== null check so that 0 is treated as a valid facility_id
         $sql = 'SELECT id FROM sites WHERE park_id = :park_id AND site_number = :site_number';
-        if ($facilityId) {
+        if ($facilityId !== null) {
             $sql .= ' AND facility_id = :facility_id';
+        } else {
+            // When facility_id is null, match rows where facility_id IS NULL
+            $sql .= ' AND facility_id IS NULL';
         }
         $sql .= ' LIMIT 1';
         
         $stmt = $this->pdo->prepare($sql);
         $params = [':park_id' => $parkId, ':site_number' => $siteNumber];
-        if ($facilityId) {
+        if ($facilityId !== null) {
             $params[':facility_id'] = $facilityId;
         }
         $stmt->execute($params);

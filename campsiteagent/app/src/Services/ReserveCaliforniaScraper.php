@@ -9,16 +9,29 @@ class ReserveCaliforniaScraper
     private HttpClient $http;
     private string $baseUrl;
     private string $rdrBaseUrl;
+    private ?BrowserScraper $browserScraper;
+    private bool $useBrowser;
 
     public function __construct(?string $userAgentOverride = null)
     {
         $this->http = new HttpClient($userAgentOverride);
         $this->baseUrl = rtrim(getenv('RC_BASE_URL') ?: 'https://www.reservecalifornia.com', '/');
         $this->rdrBaseUrl = 'https://calirdr.usedirect.com/rdr/rdr';
+        
+        // Try to initialize browser scraper
+        // Use browser by default since API is blocked
+        $this->useBrowser = getenv('RC_USE_BROWSER') !== 'false';
+        try {
+            $this->browserScraper = new BrowserScraper();
+        } catch (\Throwable $e) {
+            error_log("ReserveCaliforniaScraper: Browser scraper not available: " . $e->getMessage());
+            $this->browserScraper = null;
+            $this->useBrowser = false;
+        }
     }
 
     /**
-     * Fetch facilities for a given park number from UseDirect API
+     * Fetch facilities for a given park number
      * Returns array of [ ['facility_id' => 'xxx', 'name' => 'Bluff Camp (sites 44-66)'], ... ]
      * 
      * @param string $parkNumber Park number/PlaceId
@@ -26,41 +39,60 @@ class ReserveCaliforniaScraper
      */
     public function fetchParkFacilities(string $parkNumber, ?array $facilityFilter = null): array
     {
-        // First get all facilities (includes all parks)
-        $url = $this->rdrBaseUrl . '/fd/facilities?PlaceId=' . rawurlencode($parkNumber);
+        error_log("ReserveCaliforniaScraper: fetchParkFacilities called for park {$parkNumber}, useBrowser=" . ($this->useBrowser ? 'true' : 'false') . ", browserScraper=" . ($this->browserScraper ? 'set' : 'null'));
         
-        try {
-            [$status, $body] = $this->http->get($url);
-            if ($status >= 200 && $status < 300) {
-                $allFacilities = json_decode($body, true);
-                if (!is_array($allFacilities)) {
-                    return [];
-                }
+        // Try browser method first (since API is blocked)
+        if ($this->useBrowser && $this->browserScraper) {
+            try {
+                error_log("ReserveCaliforniaScraper: Attempting browser method for park {$parkNumber}");
+                $browserFacilities = $this->browserScraper->fetchFacilities($parkNumber);
+                error_log("ReserveCaliforniaScraper: Browser method returned " . (is_array($browserFacilities) ? count($browserFacilities) : 'non-array') . " facility(ies) for park {$parkNumber}");
                 
-                // Filter to only facilities for this park
-                $facilities = [];
-                foreach ($allFacilities as $facility) {
-                    if (isset($facility['PlaceId']) && $facility['PlaceId'] == $parkNumber) {
-                        $facilityId = (string)$facility['FacilityId'];
+                if (!is_array($browserFacilities)) {
+                    error_log("ReserveCaliforniaScraper: Browser method returned non-array data for park {$parkNumber}: " . gettype($browserFacilities));
+                    // Fall through to API method
+                } else {
+                    // Convert browser format to our format
+                    $facilities = [];
+                    foreach ($browserFacilities as $facility) {
+                        $facilityId = (string)($facility['FacilityId'] ?? $facility['facility_id'] ?? '');
+                        $name = $facility['Name'] ?? $facility['name'] ?? '';
+                        
+                        if (empty($facilityId) || empty($name)) {
+                            error_log("ReserveCaliforniaScraper: Skipping facility with missing ID or name: " . json_encode($facility));
+                            continue;
+                        }
                         
                         // Apply facility filter if provided
                         if ($facilityFilter !== null && !in_array($facilityId, $facilityFilter)) {
-                            continue; // Skip this facility
+                            error_log("ReserveCaliforniaScraper: Facility {$facilityId} filtered out by facilityFilter");
+                            continue;
                         }
                         
                         $facilities[] = [
                             'facility_id' => $facilityId,
-                            'name' => $facility['Name']
+                            'name' => $name
                         ];
                     }
+                    
+                    error_log("ReserveCaliforniaScraper: After conversion, found " . count($facilities) . " facility(ies) for park {$parkNumber}");
+                    
+                    if (!empty($facilities)) {
+                        return $facilities;
+                    } else {
+                        error_log("ReserveCaliforniaScraper: Browser method returned empty facilities array for park {$parkNumber} - API fallback disabled (blocked)");
+                    }
                 }
-                
-                return $facilities;
+            } catch (\Throwable $e) {
+                error_log("ReserveCaliforniaScraper: Browser method failed for facilities (park {$parkNumber}): " . $e->getMessage());
+                error_log("ReserveCaliforniaScraper: Stack trace: " . $e->getTraceAsString());
             }
-        } catch (\Throwable $e) {
-            // Log error and return empty
+        } else {
+            error_log("ReserveCaliforniaScraper: Browser scraper not available (useBrowser: " . ($this->useBrowser ? 'true' : 'false') . ", browserScraper: " . ($this->browserScraper ? 'set' : 'null') . ")");
         }
         
+        // API method is blocked - don't try it
+        error_log("ReserveCaliforniaScraper: Returning empty array for park {$parkNumber} (browser method returned 0 facilities, API is blocked)");
         return [];
     }
 
@@ -75,6 +107,38 @@ class ReserveCaliforniaScraper
      */
     public function fetchFacilityAvailability(string $parkNumber, string $facilityId, string $startDate, int $nights): array
     {
+        // Try browser method first (since API is blocked)
+        if ($this->useBrowser && $this->browserScraper) {
+            try {
+                error_log("ReserveCaliforniaScraper: Attempting browser method for availability (park {$parkNumber}, facility {$facilityId}, date {$startDate})");
+                $data = $this->browserScraper->fetchAvailability($parkNumber, $facilityId, $startDate, $nights);
+                error_log("ReserveCaliforniaScraper: Browser method returned " . (is_array($data) ? 'array with ' . count($data) . ' keys' : gettype($data)));
+                
+                // Validate structure
+                if (is_array($data) && isset($data['Facility']['Units'])) {
+                    error_log("ReserveCaliforniaScraper: Browser method returned valid grid data with " . count($data['Facility']['Units']) . " units");
+                    return $data;
+                }
+                
+                // If browser returned data but wrong structure, try to normalize
+                if (is_array($data) && !empty($data)) {
+                    error_log("ReserveCaliforniaScraper: Browser returned data but wrong structure. Keys: " . implode(', ', array_keys($data)));
+                    // Browser might return data in different format, try to adapt
+                    if (isset($data['Units'])) {
+                        error_log("ReserveCaliforniaScraper: Found Units at top level, normalizing structure");
+                        return ['Facility' => ['Units' => $data['Units']]];
+                    }
+                } else {
+                    error_log("ReserveCaliforniaScraper: Browser method returned empty or invalid data");
+                }
+            } catch (\Throwable $e) {
+                error_log("ReserveCaliforniaScraper: Browser method failed for availability: " . $e->getMessage());
+                error_log("ReserveCaliforniaScraper: Stack trace: " . $e->getTraceAsString());
+                // Fall through to API method
+            }
+        }
+        
+        // Fallback to API method (may be blocked, but try anyway)
         $url = $this->rdrBaseUrl . '/search/grid';
         
         $params = [
@@ -98,7 +162,7 @@ class ReserveCaliforniaScraper
                 }
             }
         } catch (\Throwable $e) {
-            // Log error
+            error_log("ReserveCaliforniaScraper: API method failed for availability: " . $e->getMessage());
         }
         
         return [];
@@ -114,15 +178,34 @@ class ReserveCaliforniaScraper
      * @param array|null $facilityFilter Optional array of facility IDs to include (null = all)
      * @return array [ ['site_number' => '12', 'site_name' => 'Bluff #12', 'facility_id' => '674', 'dates' => ['YYYY-MM-DD' => true/false, ...]], ... ]
      */
-    public function fetchMonthlyAvailability(string $parkNumber, string $yearMonth, ?callable $facilityMapper = null, ?array $facilityFilter = null): array
+    public function fetchMonthlyAvailability(string $parkNumber, string $yearMonth, ?callable $facilityMapper = null, ?array $facilityFilter = null, ?callable $debugCallback = null): array
     {
         // Parse year-month
-        $startDate = $yearMonth . '-01';
-        $endDate = date('Y-m-t', strtotime($startDate)); // Last day of month
-        $days = (int)date('t', strtotime($startDate));
+        // For the current month, start from today to get more relevant data
+        // For future months, start from the 1st
+        $today = new \DateTime();
+        $requestedMonth = new \DateTime($yearMonth . '-01');
+        $isCurrentMonth = ($today->format('Y-m') === $yearMonth);
+        
+        if ($isCurrentMonth) {
+            // For current month, use today's date to get data starting from today
+            $startDate = $today->format('Y-m-d');
+            if ($debugCallback) {
+                $debugCallback("    📅 Current month detected, using today's date: {$startDate}");
+            }
+        } else {
+            // For future months, start from the 1st
+            $startDate = $yearMonth . '-01';
+        }
+        
+        $endDate = date('Y-m-t', strtotime($yearMonth . '-01')); // Last day of month
+        $days = (int)date('t', strtotime($yearMonth . '-01'));
         
         // Get all facilities for this park (with optional filter)
         $facilities = $this->fetchParkFacilities($parkNumber, $facilityFilter);
+        if ($debugCallback) {
+            $debugCallback("🔍 Found " . count($facilities) . " facility(ies) for park {$parkNumber} in {$yearMonth}");
+        }
         if (empty($facilities)) {
             return [];
         }
@@ -131,6 +214,9 @@ class ReserveCaliforniaScraper
         
         // Fetch availability for each facility
         foreach ($facilities as $facility) {
+            if ($debugCallback) {
+                $debugCallback("  → Fetching facility: {$facility['name']} (ID: {$facility['facility_id']})");
+            }
             // Get DB facility ID if mapper provided
             $facilityDbId = null;
             if ($facilityMapper) {
@@ -139,6 +225,9 @@ class ReserveCaliforniaScraper
             
             // Request 1 night to get all single-date availability
             // The API will return slices for all days in the range
+            if ($debugCallback) {
+                $debugCallback("    📅 Fetching availability for {$yearMonth} (start date: {$startDate})");
+            }
             $gridData = $this->fetchFacilityAvailability(
                 $parkNumber,
                 $facility['facility_id'],
@@ -146,11 +235,42 @@ class ReserveCaliforniaScraper
                 1  // Changed from $days to 1 to get single-night availability
             );
             
+            if ($debugCallback) {
+                if (empty($gridData)) {
+                    $debugCallback("    ⚠️ No grid data returned for {$yearMonth}");
+                } else {
+                    $unitsCount = isset($gridData['Facility']['Units']) ? count($gridData['Facility']['Units']) : 0;
+                    $debugCallback("    ✅ Got grid data with {$unitsCount} units for {$yearMonth}");
+                    
+                    // Check date range in response
+                    if (isset($gridData['StartDate'])) {
+                        $debugCallback("    📅 API returned StartDate: {$gridData['StartDate']}");
+                    }
+                    if (isset($gridData['Facility']['Units']) && count($gridData['Facility']['Units']) > 0) {
+                        $firstUnit = reset($gridData['Facility']['Units']);
+                        if (isset($firstUnit['Slices']) && count($firstUnit['Slices']) > 0) {
+                            $firstSlice = reset($firstUnit['Slices']);
+                            $lastSlice = end($firstUnit['Slices']);
+                            $firstDate = $firstSlice['Date'] ?? 'unknown';
+                            $lastDate = $lastSlice['Date'] ?? 'unknown';
+                            $debugCallback("    📅 Slice date range: {$firstDate} to {$lastDate}");
+                        }
+                    }
+                }
+            }
+            
             if (empty($gridData) || !isset($gridData['Facility']['Units'])) {
+                if ($debugCallback) {
+                    $debugCallback("    ⚠️ No grid data or units returned for facility {$facility['name']}");
+                }
                 continue;
             }
             
             // Parse units/sites
+            $unitsCount = count($gridData['Facility']['Units']);
+            if ($debugCallback) {
+                $debugCallback("    📊 Found {$unitsCount} unit(s) in facility {$facility['name']}");
+            }
             foreach ($gridData['Facility']['Units'] as $unitId => $unit) {
                 $siteData = [
                     'site_number' => $unit['ShortName'] ?? $unitId,
@@ -165,20 +285,77 @@ class ReserveCaliforniaScraper
                 ];
                 
                 // Parse availability slices
-                if (isset($unit['Slices']) && is_array($unit['Slices'])) {
-                    foreach ($unit['Slices'] as $slice) {
-                        $date = $slice['Date'];
+                if (isset($unit['Slices'])) {
+                    $slices = $unit['Slices'];
+                    $slicesArray = is_array($slices) ? $slices : (array)$slices;
+                    $slicesCount = count($slicesArray);
+                    $availableCount = 0;
+                    $unavailableCount = 0;
+                    foreach ($slicesArray as $slice) {
+                        // Skip null slices
+                        if ($slice === null || !is_array($slice)) {
+                            continue;
+                        }
+                        
+                        $date = $slice['Date'] ?? null;
+                        if (!$date) {
+                            continue;
+                        }
+                        
+                        // Only filter out dates that are clearly unreasonable (more than 2 years in the future)
+                        // This prevents storing dates from way outside the requested range while allowing
+                        // the API's natural response window when Nights=1
+                        $maxReasonableDate = date('Y-m-d', strtotime('+2 years'));
+                        if ($date > $maxReasonableDate) {
+                            continue;
+                        }
+                        
                         // Site is available if IsFree=true and not blocked/reserved
-                        $isAvailable = ($slice['IsFree'] ?? false) 
-                            && !($slice['IsBlocked'] ?? false)
-                            && ($slice['ReservationId'] ?? 0) == 0;
+                        $isFree = $slice['IsFree'] ?? false;
+                        $isBlocked = $slice['IsBlocked'] ?? false;
+                        $reservationId = $slice['ReservationId'] ?? 0;
+                        $isAvailable = $isFree && !$isBlocked && $reservationId == 0;
+                        
+                        if ($isAvailable) {
+                            $availableCount++;
+                        } else {
+                            $unavailableCount++;
+                        }
                         
                         $siteData['dates'][$date] = $isAvailable;
+                    }
+                    
+                    if ($debugCallback && $slicesCount > 0) {
+                        $siteNum = $siteData['site_number'];
+                        $debugCallback("      Site {$siteNum}: {$slicesCount} slice(s) - {$availableCount} available, {$unavailableCount} unavailable");
+                    }
+                } else {
+                    // No slices for this unit - still add the site but with empty dates
+                    if ($debugCallback) {
+                        $siteNum = $siteData['site_number'];
+                        $debugCallback("      Site {$siteNum}: No slices returned");
                     }
                 }
                 
                 $allSites[] = $siteData;
             }
+        }
+        
+        if ($debugCallback) {
+            $totalSites = count($allSites);
+            $sitesWithDates = 0;
+            $totalAvailableDates = 0;
+            foreach ($allSites as $site) {
+                if (!empty($site['dates'])) {
+                    $sitesWithDates++;
+                    foreach ($site['dates'] as $date => $avail) {
+                        if ($avail) {
+                            $totalAvailableDates++;
+                        }
+                    }
+                }
+            }
+            $debugCallback("📊 Summary for {$yearMonth}: {$totalSites} site(s) found, {$sitesWithDates} with date data, {$totalAvailableDates} available date(s)");
         }
         
         return $allSites;

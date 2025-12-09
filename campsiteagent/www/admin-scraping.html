@@ -754,7 +754,11 @@
                     </div>
                     <div class="stat-card">
                         <div class="stat-value" id="sitesFound">0</div>
-                        <div class="stat-label">Sites Found</div>
+                        <div class="stat-label">Weekend Sites</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="availableSites">0</div>
+                        <div class="stat-label">Available Sites</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-value" id="errorsCount">0</div>
@@ -879,6 +883,7 @@
         let stats = {
             parksProcessed: 0,
             sitesFound: 0,
+            availableSites: 0,
             errorsCount: 0
         };
 
@@ -957,7 +962,7 @@
             
             isScraping = true;
             startTime = Date.now();
-            stats = { parksProcessed: 0, sitesFound: 0, errorsCount: 0 };
+            stats = { parksProcessed: 0, sitesFound: 0, availableSites: 0, errorsCount: 0 };
             
             // Update UI
             document.getElementById('startScraping').style.display = 'none';
@@ -1029,6 +1034,20 @@
                     if (data.type === 'error') {
                         stats.errorsCount++;
                     }
+                    // Track available sites from info messages
+                    if (data.type === 'info' && data.message && data.message.includes('Found') && data.message.includes('site(s) with available dates')) {
+                        const match = data.message.match(/Found\s+(\d+)\s+site\(s\)/);
+                        if (match) {
+                            stats.availableSites += parseInt(match[1]);
+                        }
+                    }
+                    // Track available sites from park_complete messages
+                    if (data.type === 'park_complete' && data.availableSites !== undefined) {
+                        // availableSites is already counted in the info message, but we can use it as a fallback
+                        if (data.availableSites > 0 && stats.availableSites === 0) {
+                            stats.availableSites = data.availableSites;
+                        }
+                    }
                     if (data.type === 'park_complete' && data.message && data.message.includes('sites found')) {
                         const match = data.message.match(/(\d+)\s+sites found/);
                         if (match) {
@@ -1085,6 +1104,7 @@
         function updateStats() {
             document.getElementById('parksProcessed').textContent = stats.parksProcessed;
             document.getElementById('sitesFound').textContent = stats.sitesFound;
+            document.getElementById('availableSites').textContent = stats.availableSites;
             document.getElementById('errorsCount').textContent = stats.errorsCount;
             
             if (startTime) {

@@ -83,7 +83,9 @@ if ((int)$gotLock !== 1) {
 		exit(1);
 	}
 
-	$sent = 0; $failed = 0; $skipped = 0; $details = [];
+	$sent = 0; $failed = 0; $skipped = 0; $skippedAlreadySent = 0; $skippedNoPrefs = 0; $skippedNoAvailability = 0;
+	$details = [];
+	$skippedEmails = [];
 
     foreach ($users as $user) {
 		$userId = (int)$user['id'];
@@ -94,6 +96,8 @@ if ((int)$gotLock !== 1) {
         if ($emailLogs->hasSentDailyDigestToday($email)) {
             $log("  ⏭️  Already sent Daily Digest today");
             $skipped++;
+            $skippedAlreadySent++;
+            $skippedEmails[] = ['email' => $email, 'reason' => 'already_sent_today'];
             continue;
         }
 
@@ -104,6 +108,8 @@ if ((int)$gotLock !== 1) {
 		if (empty($prefs)) {
 			$log("  ⏭️  No enabled preferences");
 			$skipped++;
+			$skippedNoPrefs++;
+			$skippedEmails[] = ['email' => $email, 'reason' => 'no_enabled_preferences'];
 			continue;
 		}
 
@@ -158,6 +164,16 @@ if ((int)$gotLock !== 1) {
 			$startDate = $pref['start_date'] ?? null;
 			$endDate = $pref['end_date'] ?? null;
 			$weekendOnlyPref = isset($pref['weekend_only']) ? ((int)$pref['weekend_only'] === 1) : true;
+			
+			// If end_date is in the past, ignore it (treat as NULL) since user wants current availability
+			$today = date('Y-m-d');
+			if ($endDate && $endDate < $today) {
+				$endDate = null;
+			}
+			// If start_date is in the past, ignore it (treat as NULL) since user wants current availability
+			if ($startDate && $startDate < $today) {
+				$startDate = null;
+			}
 
 			foreach ($byPark as $parkName => $sites) {
 				foreach ($sites as $s) {
@@ -207,6 +223,8 @@ if ((int)$gotLock !== 1) {
 		if (empty($userAlertSites)) {
 			$log("  ⏭️  No matching availability for user");
 			$skipped++;
+			$skippedNoAvailability++;
+			$skippedEmails[] = ['email' => $email, 'reason' => 'no_matching_availability'];
 			continue;
 		}
 
@@ -259,13 +277,34 @@ if ((int)$gotLock !== 1) {
 
     // Summary
 	echo "\n📊 SUMMARY:\n";
-	echo "  Sent: $sent\n";
-	echo "  Failed: $failed\n";
-	echo "  Skipped: $skipped\n";
+	echo "  ✅ Sent: $sent\n";
+	echo "  ❌ Failed: $failed\n";
+	echo "  ⏭️  Skipped: $skipped\n";
+	if ($skipped > 0) {
+		echo "     - Already sent today: $skippedAlreadySent\n";
+		echo "     - No enabled preferences: $skippedNoPrefs\n";
+		echo "     - No matching availability: $skippedNoAvailability\n";
+	}
 	if (!empty($details)) {
-		echo "\n📧 DETAILS:\n";
+		echo "\n📧 EMAILS SENT:\n";
 		foreach ($details as $d) {
-			echo "  {$d['email']}: {$d['sites']} sites" . (isset($d['dateRange']) ? " ({$d['dateRange']})" : "") . "\n";
+			echo "  ✅ {$d['email']}: {$d['sites']} sites" . (isset($d['dateRange']) ? " ({$d['dateRange']})" : "") . "\n";
+		}
+	}
+	if (!empty($skippedEmails) && $verbose) {
+		echo "\n⏭️  SKIPPED EMAILS:\n";
+		foreach ($skippedEmails as $se) {
+			$reason = 'Unknown';
+			if ($se['reason'] === 'already_sent_today') {
+				$reason = 'Already sent today (idempotency check)';
+			} elseif ($se['reason'] === 'no_enabled_preferences') {
+				$reason = 'No enabled preferences';
+			} elseif ($se['reason'] === 'no_matching_availability') {
+				$reason = 'No matching availability';
+			} else {
+				$reason = $se['reason'];
+			}
+			echo "  ⏭️  {$se['email']}: $reason\n";
 		}
 	}
 

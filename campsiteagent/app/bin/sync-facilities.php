@@ -70,7 +70,9 @@ foreach ($parks as $park) {
             $dbId = $facilityRepo->upsertFacility(
                 (int)$park['id'],
                 $facilityName,
-                $facilityId
+                $facilityId,
+                null, // description
+                $facilityId // external_facility_id (same as facility_id)
             );
             
             echo "      ✅ [{$facilityId}] {$facilityName} (DB ID: {$dbId})\n";

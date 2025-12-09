@@ -89,6 +89,16 @@ if ($dryRun) {
             $startDate = $pref['start_date'] ?? null;
             $endDate = $pref['end_date'] ?? null;
             $weekendOnlyPref = isset($pref['weekend_only']) ? ((int)$pref['weekend_only'] === 1) : true;
+            
+            // If end_date is in the past, ignore it (treat as NULL) since user wants current availability
+            $today = date('Y-m-d');
+            if ($endDate && $endDate < $today) {
+                $endDate = null;
+            }
+            // If start_date is in the past, ignore it (treat as NULL) since user wants current availability
+            if ($startDate && $startDate < $today) {
+                $startDate = null;
+            }
 
             foreach ($byPark as $parkName => $sites) {
                 foreach ($sites as $s) {

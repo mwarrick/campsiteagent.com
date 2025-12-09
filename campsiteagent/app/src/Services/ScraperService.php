@@ -99,6 +99,12 @@ class ScraperService
             $runId = $this->runs->startRun((int)$park['id']);
             try {
                 $parkNumber = $park['park_number'] ?? $park['external_id'];
+                if ($progressCallback) {
+                    $progressCallback([
+                        'type' => 'debug',
+                        'message' => "🔍 Park: {$park['name']} | DB ID: {$park['id']} | Park Number: {$parkNumber} | External ID: " . ($park['external_id'] ?? 'N/A')
+                    ]);
+                }
                 $siteEntries = $this->fetchMonths((string)$parkNumber, $monthsToScrape, $progressCallback);
                 // No fallback stub data - if scraping fails, return empty array
 
@@ -106,7 +112,12 @@ class ScraperService
                 $alertSites = [];
                 $earliestDate = null;
                 $latestDate = null;
+                $availableSitesCount = 0; // Track sites with at least one available date
+                $sitesWritten = 0; // Track how many sites we've successfully written
 
+                // IMPORTANT: With PDO autocommit ON (default), each upsertSite/upsertAvailability 
+                // commits immediately. So sites are saved to DB as they're processed, not batched.
+                // If the process crashes, already-written sites remain in the database.
                 foreach ($siteEntries as $s) {
                     // Validate facility_db_id before creating site
                     $facilityDbId = $s['facility_db_id'] ?? null;
@@ -115,34 +126,70 @@ class ScraperService
                         continue;
                     }
                     
-                    // Upsert site with all metadata
-                    $siteId = $this->sites->upsertSite(
-                        (int)$park['id'], 
-                        $s['site_number'], 
-                        $s['site_type'] ?? null,
-                        [], // attributes_json (for future use)
-                        $facilityDbId, // facility_id (our DB ID)
-                        $s['site_name'] ?? null,
-                        $s['unit_type_id'] ?? null,
-                        $s['is_ada'] ?? false,
-                        $s['vehicle_length'] ?? 0,
-                        $s['site_number'], // external_site_id (API site number)
-                        $s['unit_type_id'] ? (string)$s['unit_type_id'] : null, // external_unit_type_id
-                        $s['facility_id'] // external_facility_id (API facility ID)
-                    );
-                    
-                    foreach ($s['dates'] as $date => $avail) {
-                        $this->sites->upsertAvailability($siteId, $date, (bool)$avail);
-                        
-                        // Track date range
-                        if ($avail) {
-                            if ($earliestDate === null || $date < $earliestDate) {
-                                $earliestDate = $date;
-                            }
-                            if ($latestDate === null || $date > $latestDate) {
-                                $latestDate = $date;
-                            }
+                    try {
+                        // Upsert site with all metadata
+                        // NOTE: This commits immediately (PDO autocommit ON by default)
+                        $siteId = $this->sites->upsertSite(
+                            (int)$park['id'], 
+                            $s['site_number'], 
+                            $s['site_type'] ?? null,
+                            [], // attributes_json (for future use)
+                            $facilityDbId, // facility_id (our DB ID)
+                            $s['site_name'] ?? null,
+                            $s['unit_type_id'] ?? null,
+                            $s['is_ada'] ?? false,
+                            $s['vehicle_length'] ?? 0,
+                            $s['site_number'], // external_site_id (API site number)
+                            $s['unit_type_id'] ? (string)$s['unit_type_id'] : null, // external_unit_type_id
+                            $s['facility_id'] // external_facility_id (API facility ID)
+                        );
+                        $sitesWritten++;
+                    } catch (\Throwable $e) {
+                        $errorMsg = "Failed to upsert site {$s['site_number']} in park {$park['name']}: " . $e->getMessage();
+                        error_log("ScraperService: " . $errorMsg);
+                        if ($progressCallback) {
+                            $progressCallback([
+                                'type' => 'error',
+                                'message' => "⚠️ " . $errorMsg
+                            ]);
                         }
+                        continue; // Skip this site and continue with next
+                    }
+                    
+                    $hasAvailableDates = false;
+                    $datesWritten = 0;
+                    foreach ($s['dates'] as $date => $avail) {
+                        try {
+                            // NOTE: This commits immediately (PDO autocommit ON by default)
+                            $this->sites->upsertAvailability($siteId, $date, (bool)$avail);
+                            $datesWritten++;
+                            
+                            // Track date range and availability
+                            if ($avail) {
+                                $hasAvailableDates = true;
+                                if ($earliestDate === null || $date < $earliestDate) {
+                                    $earliestDate = $date;
+                                }
+                                if ($latestDate === null || $date > $latestDate) {
+                                    $latestDate = $date;
+                                }
+                            }
+                        } catch (\Throwable $e) {
+                            $errorMsg = "Failed to upsert availability for site {$s['site_number']} date {$date}: " . $e->getMessage();
+                            error_log("ScraperService: " . $errorMsg);
+                            if ($progressCallback) {
+                                $progressCallback([
+                                    'type' => 'error',
+                                    'message' => "⚠️ " . $errorMsg
+                                ]);
+                            }
+                            // Continue with next date
+                        }
+                    }
+                    
+                    // Count sites with at least one available date
+                    if ($hasAvailableDates) {
+                        $availableSitesCount++;
                     }
                     
                     $weekendDates = $this->detector->getWeekendDates($s['dates']);
@@ -156,6 +203,14 @@ class ScraperService
                             'weekend_dates' => $weekendDates  // Array of Fri-Sat pairs
                         ];
                     }
+                }
+
+                // Report available sites count
+                if ($progressCallback && !empty($siteEntries)) {
+                    $progressCallback([
+                        'type' => 'info',
+                        'message' => "📊 Found {$availableSitesCount} site(s) with available dates for {$park['name']} (wrote {$sitesWritten} site(s) to database)"
+                    ]);
                 }
 
                 // Reconcile: mark dates in the selected window that disappeared as unavailable
@@ -181,26 +236,38 @@ class ScraperService
                                 continue;
                             }
                             
-                            $siteIdForRecon = $this->sites->upsertSite(
-                                (int)$park['id'],
-                                $se['site_number'],
-                                $se['site_type'] ?? null,
-                                [],
-                                $facilityDbId,
-                                $se['site_name'] ?? null,
-                                $se['unit_type_id'] ?? null,
-                                $se['is_ada'] ?? false,
-                                $se['vehicle_length'] ?? 0,
-                                $se['site_number'], // external_site_id (API site number)
-                                $se['unit_type_id'] ? (string)$se['unit_type_id'] : null, // external_unit_type_id
-                                $se['facility_id'] // external_facility_id (API facility ID)
-                            );
-                            // Build list of available dates from the latest scrape for this site
-                            $nowAvailable = [];
-                            foreach ($se['dates'] as $d => $avail) {
-                                if ($avail) { $nowAvailable[] = $d; }
+                            try {
+                                $siteIdForRecon = $this->sites->upsertSite(
+                                    (int)$park['id'],
+                                    $se['site_number'],
+                                    $se['site_type'] ?? null,
+                                    [],
+                                    $facilityDbId,
+                                    $se['site_name'] ?? null,
+                                    $se['unit_type_id'] ?? null,
+                                    $se['is_ada'] ?? false,
+                                    $se['vehicle_length'] ?? 0,
+                                    $se['site_number'], // external_site_id (API site number)
+                                    $se['unit_type_id'] ? (string)$se['unit_type_id'] : null, // external_unit_type_id
+                                    $se['facility_id'] // external_facility_id (API facility ID)
+                                );
+                                // Build list of available dates from the latest scrape for this site
+                                $nowAvailable = [];
+                                foreach ($se['dates'] as $d => $avail) {
+                                    if ($avail) { $nowAvailable[] = $d; }
+                                }
+                                $totalReconciled += $this->sites->reconcileUnavailableDates($siteIdForRecon, $minScrapedDate, $maxScrapedDate, $nowAvailable);
+                            } catch (\Throwable $e) {
+                                $errorMsg = "Failed to reconcile site {$se['site_number']} in park {$park['name']}: " . $e->getMessage();
+                                error_log("ScraperService: " . $errorMsg);
+                                if ($progressCallback) {
+                                    $progressCallback([
+                                        'type' => 'error',
+                                        'message' => "⚠️ " . $errorMsg
+                                    ]);
+                                }
+                                // Continue with next site
                             }
-                            $totalReconciled += $this->sites->reconcileUnavailableDates($siteIdForRecon, $minScrapedDate, $maxScrapedDate, $nowAvailable);
                         }
 
                         if ($progressCallback) {
@@ -244,11 +311,17 @@ class ScraperService
                 $results[] = $result;
                 
                 if ($progressCallback) {
+                    $weekendSitesCount = count($alertSites);
+                    $message = $weekendFound 
+                        ? "✅ Weekend availability found! ({$weekendSitesCount} site(s) with weekend availability)" 
+                        : "❌ No weekend availability ({$availableSitesCount} site(s) with available dates, but none for weekends)";
                     $progressCallback([
                         'type' => 'park_complete',
                         'park' => $park['name'],
                         'weekendFound' => $weekendFound,
-                        'message' => $weekendFound ? '✅ Weekend availability found!' : '❌ No weekend availability'
+                        'availableSites' => $availableSitesCount,
+                        'weekendSites' => $weekendSitesCount,
+                        'message' => $message
                     ]);
                 }
             } catch (\Throwable $e) {
@@ -332,28 +405,34 @@ class ScraperService
         };
         
         $entries = [];
-        // Start from first day of current month
-        $start = new \DateTime('first day of this month');
-        
-        // Calculate target: ensure we cover at least the month that contains "6 months from today"
+        // Start from first day of current month (use today's date to ensure we get current month)
         $today = new \DateTime();
-        $sixMonthsFromToday = clone $today;
-        $sixMonthsFromToday->modify('+6 months');
-        $targetMonth = $sixMonthsFromToday->format('Y-m');
-        
-        // Calculate how many months we need to scrape to reach the target month
-        $currentMonth = $start->format('Y-m');
-        $monthsNeeded = 0;
-        $checkMonth = clone $start;
-        while ($checkMonth->format('Y-m') < $targetMonth) {
+        $start = new \DateTime($today->format('Y-m-01')); // First day of current month
+
+        // Only apply the "6 months from today" logic if monthsToScrape is 6 (default/all)
+        // Otherwise, respect the user's specific date range selection
+        $actualMonthsToScrape = $monthsToScrape;
+        if ($monthsToScrape >= 6) {
+            // Calculate target: ensure we cover at least the month that contains "6 months from today"
+            $today = new \DateTime();
+            $sixMonthsFromToday = clone $today;
+            $sixMonthsFromToday->modify('+6 months');
+            $targetMonth = $sixMonthsFromToday->format('Y-m');
+
+            // Calculate how many months we need to scrape to reach the target month
+            $currentMonth = $start->format('Y-m');
+            $monthsNeeded = 0;
+            $checkMonth = clone $start;
+            while ($checkMonth->format('Y-m') < $targetMonth) {
+                $monthsNeeded++;
+                $checkMonth->modify('+1 month');
+            }
+            // Add one more month to ensure we include the target month
             $monthsNeeded++;
-            $checkMonth->modify('+1 month');
+
+            // Use the larger of: requested months or months needed to reach target
+            $actualMonthsToScrape = max($monthsToScrape, $monthsNeeded);
         }
-        // Add one more month to ensure we include the target month
-        $monthsNeeded++;
-        
-        // Use the larger of: requested months or months needed to reach target
-        $actualMonthsToScrape = max($monthsToScrape, $monthsNeeded);
         
         for ($i = 0; $i < $actualMonthsToScrape; $i++) {
             $ym = $start->format('Y-m');
@@ -368,8 +447,16 @@ class ScraperService
                 ]);
             }
             
-            // Pass facility filter to scraper
-            $monthEntries = $this->rc->fetchMonthlyAvailability($parkNumber, $ym, $facilityMapper, $facilityFilter);
+            // Pass facility filter to scraper with debug callback
+            $debugCallback = function($message) use ($progressCallback) {
+                if ($progressCallback) {
+                    $progressCallback([
+                        'type' => 'debug',
+                        'message' => $message
+                    ]);
+                }
+            };
+            $monthEntries = $this->rc->fetchMonthlyAvailability($parkNumber, $ym, $facilityMapper, $facilityFilter, $debugCallback);
             $entries = $this->mergeSiteEntries($entries, $monthEntries);
             $start->modify('+1 month');
         }
