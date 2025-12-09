@@ -38,9 +38,9 @@ sudo mysql -u root -p
 ```
 
 ```sql
-CREATE DATABASE campsitechecker CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'campsiteagent'@'localhost' IDENTIFIED BY 'secure_password_here';
-GRANT ALL PRIVILEGES ON campsitechecker.* TO 'campsiteagent'@'localhost';
+CREATE DATABASE your_database_name CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'your_database_user'@'localhost' IDENTIFIED BY 'your_secure_password_here';
+GRANT ALL PRIVILEGES ON your_database_name.* TO 'your_database_user'@'localhost';
 FLUSH PRIVILEGES;
 EXIT;
 ```
@@ -91,9 +91,9 @@ sudo -u www-data nano /var/www/campsiteagent/app/.env
 # Database Configuration
 DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_DATABASE=campsitechecker
-DB_USERNAME=campsiteagent
-DB_PASSWORD=secure_password_here
+DB_DATABASE=your_database_name
+DB_USERNAME=your_database_user
+DB_PASSWORD=your_secure_password_here
 
 # ReserveCalifornia API
 RC_BASE_URL=https://www.reservecalifornia.com
@@ -360,7 +360,8 @@ tail -n 20 /var/log/apache2/campsiteagent_error.log
 echo
 
 echo "=== Database Connection Test ==="
-mysql -u campsiteagent -p'your_password' -e "SELECT COUNT(*) as user_count FROM users;" campsitechecker
+# Use environment variable or .env file for password
+mysql -u $DB_USER -p$DB_PASS -e "SELECT COUNT(*) as user_count FROM users;" $DB_NAME
 ```
 
 ```bash
@@ -380,9 +381,10 @@ sudo nano /usr/local/bin/campsiteagent-backup.sh
 
 BACKUP_DIR="/var/backups/campsiteagent"
 DATE=$(date +%Y%m%d_%H%M%S)
-DB_NAME="campsitechecker"
-DB_USER="campsiteagent"
-DB_PASS="your_password"
+# Load database credentials from environment or .env file
+DB_NAME="${DB_DATABASE:-campsitechecker}"
+DB_USER="${DB_USERNAME:-campsiteagent}"
+DB_PASS="${DB_PASSWORD}"
 
 # Create backup directory
 mkdir -p $BACKUP_DIR
@@ -516,10 +518,16 @@ $health = [
 
 // Database check
 try {
+    // Use environment variables - never hardcode credentials
+    $host = getenv('DB_HOST') ?: '127.0.0.1';
+    $db = getenv('DB_DATABASE') ?: 'campsitechecker';
+    $user = getenv('DB_USERNAME') ?: 'campsiteagent';
+    $pass = getenv('DB_PASSWORD') ?: '';
+    
     $pdo = new PDO(
-        'mysql:host=127.0.0.1;dbname=campsitechecker',
-        'campsiteagent',
-        'your_password'
+        "mysql:host={$host};dbname={$db}",
+        $user,
+        $pass
     );
     $health['checks']['database'] = 'ok';
 } catch (Exception $e) {

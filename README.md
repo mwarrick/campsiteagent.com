@@ -170,9 +170,9 @@ campsiteagent/
    # Database Configuration
    DB_HOST=127.0.0.1
    DB_PORT=3306
-   DB_DATABASE=campsitechecker
-   DB_USERNAME=root
-   DB_PASSWORD=your_password
+   DB_DATABASE=your_database_name
+   DB_USERNAME=your_database_user
+   DB_PASSWORD=your_secure_password_here
    
    # ReserveCalifornia API
    RC_BASE_URL=https://www.reservecalifornia.com
