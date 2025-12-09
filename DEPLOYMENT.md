@@ -64,19 +64,20 @@ sudo -u www-data composer install --no-dev --optimize-autoloader
 ```bash
 # Run database migrations
 cd /var/www/campsiteagent/app
-mysql -u campsiteagent -p campsitechecker < migrations/001_create_notifications.sql
-mysql -u campsiteagent -p campsitechecker < migrations/002_create_users.sql
-mysql -u campsiteagent -p campsitechecker < migrations/003_create_login_tokens.sql
-mysql -u campsiteagent -p campsitechecker < migrations/004_create_parks.sql
-mysql -u campsiteagent -p campsitechecker < migrations/005_create_sites_and_availability.sql
-mysql -u campsiteagent -p campsitechecker < migrations/006_create_availability_runs.sql
-mysql -u campsiteagent -p campsitechecker < migrations/007_create_settings.sql
-mysql -u campsiteagent -p campsitechecker < migrations/008_add_park_number.sql
-mysql -u campsiteagent -p campsitechecker < migrations/009_create_facilities.sql
-mysql -u campsiteagent -p campsitechecker < migrations/010_enhance_sites_metadata_fixed.sql
-mysql -u campsiteagent -p campsitechecker < migrations/011_create_user_alert_preferences.sql
-mysql -u campsiteagent -p campsitechecker < migrations/012_add_popular_socal_parks.sql
-mysql -u campsiteagent -p campsitechecker < migrations/013_add_user_selected_parks.sql
+# Use your actual database credentials from .env file
+mysql -u $DB_USERNAME -p$DB_PASSWORD $DB_DATABASE < migrations/001_create_notifications.sql
+mysql -u $DB_USERNAME -p$DB_PASSWORD $DB_DATABASE < migrations/002_create_users.sql
+mysql -u $DB_USERNAME -p$DB_PASSWORD $DB_DATABASE < migrations/003_create_login_tokens.sql
+mysql -u $DB_USERNAME -p$DB_PASSWORD $DB_DATABASE < migrations/004_create_parks.sql
+mysql -u $DB_USERNAME -p$DB_PASSWORD $DB_DATABASE < migrations/005_create_sites_and_availability.sql
+mysql -u $DB_USERNAME -p$DB_PASSWORD $DB_DATABASE < migrations/006_create_availability_runs.sql
+mysql -u $DB_USERNAME -p$DB_PASSWORD $DB_DATABASE < migrations/007_create_settings.sql
+mysql -u $DB_USERNAME -p$DB_PASSWORD $DB_DATABASE < migrations/008_add_park_number.sql
+mysql -u $DB_USERNAME -p$DB_PASSWORD $DB_DATABASE < migrations/009_create_facilities.sql
+mysql -u $DB_USERNAME -p$DB_PASSWORD $DB_DATABASE < migrations/010_enhance_sites_metadata_fixed.sql
+mysql -u $DB_USERNAME -p$DB_PASSWORD $DB_DATABASE < migrations/011_create_user_alert_preferences.sql
+mysql -u $DB_USERNAME -p$DB_PASSWORD $DB_DATABASE < migrations/012_add_popular_socal_parks.sql
+mysql -u $DB_USERNAME -p$DB_PASSWORD $DB_DATABASE < migrations/013_add_user_selected_parks.sql
 ```
 
 ### 6. Configure Environment
@@ -216,7 +217,8 @@ sudo systemctl restart mysql
 
 ```bash
 # Create admin user
-mysql -u campsiteagent -p campsitechecker
+# Use your actual database credentials from .env file
+mysql -u $DB_USERNAME -p$DB_PASSWORD $DB_DATABASE
 ```
 
 ```sql
@@ -481,7 +483,8 @@ sudo a2enmod deflate
 2. **Database Connection Issues**
    ```bash
    # Test database connection
-   mysql -u campsiteagent -p campsitechecker -e "SELECT 1;"
+   # Use your actual database credentials from .env file
+   mysql -u $DB_USERNAME -p$DB_PASSWORD $DB_DATABASE -e "SELECT 1;"
    ```
 
 3. **Apache Configuration Issues**
